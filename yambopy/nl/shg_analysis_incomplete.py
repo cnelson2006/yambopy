@@ -211,22 +211,6 @@ def get_epsilon(mat, value, unit='eV'):
 ##########################################################################
 
 class Substrate(object):
-    """A layer whose optical constants come from refractiveindex.info.
-
-    Parameters
-    ----------
-    name : str
-        Search keyword, e.g. "SiO2", "Si", "Ag".
-    record_index : int
-        Which search hit to use (see print_search).  Note the
-        index depends on the database snapshot ordering; prefer source=.
-    source : str
-        Select the record whose source string contains this text
-        (case-insensitive), e.g. source="Johnson".  Overrides record_index.
-    db_root : str
-        Database location (see section 2).
-    """
-
     def __init__(self, name, record_index=0, source=None, db_root=None):
         self.name = name
         results = search_database(name, db_root=db_root)
@@ -287,25 +271,6 @@ class Substrate(object):
 
 
 class SimulatedMaterial(object):
-    """Effective optical constants of a 2D material from yambo chi^(1).
-
-    n and k are computed once at construction (Lz/h sheet correction plus
-    the Gaussian eps = 1 + 4*pi*chi, thin-bulk-slab approximation, see
-    nk_from_chi1_supercell) and served at arbitrary
-    energies by linear interpolation on the computed grid.  Energies
-    outside the grid return NaN, no silent extrapolation.
-
-    Parameters
-    ----------
-    omega_eV : array_like
-        Energy grid of the yambo calculation, in eV.
-    chi1_supercell : array_like (complex)
-        Supercell-averaged chi^(1) on that grid (Gaussian units).
-    Lz_SI : float
-        Supercell height in metres.
-    h_2D : float
-        Physical monolayer thickness in metres (e.g. 0.65e-9 for MoS2).
-    """
 
     def __init__(self, omega_eV, chi1_supercell, Lz_SI, h_2D,
                  name="2D material"):
@@ -344,41 +309,7 @@ class SimulatedMaterial(object):
                 % (self.name, self._lo, self._hi))
 
 
-class ConstantIndexMaterial(object):
-    """A layer with a fixed (possibly complex) refractive index.
 
-    Useful for tests, idealized media and vacuum.
-    """
-
-    def __init__(self, n_complex, e_range_eV=(0.0, 100.0), name="constant"):
-        self.name = name
-        self._n = complex(n_complex)
-        self._lo, self._hi = e_range_eV
-
-    def n(self, e):
-        return np.full(np.shape(np.asarray(e, float)) or (), self._n.real)
-
-    def k(self, e):
-        return np.full(np.shape(np.asarray(e, float)) or (), self._n.imag)
-
-    def complex_index(self, e):
-        e = np.asarray(e, float)
-        return np.full(e.shape or (), self._n, dtype=complex)
-
-    def epsilon(self, e):
-        return self.complex_index(e)**2
-
-    def wl_range_eV(self):
-        return (self._lo, self._hi)
-
-    def covers(self, e):
-        e = np.asarray(e, float)
-        return bool(np.all((e >= self._lo) & (e <= self._hi)))
-
-    def __str__(self):
-        return ("\n * * * ConstantIndexMaterial * * *\n"
-                "Material : %s\nn        : %s\nValid    : %.2f-%.2f eV\n"
-                % (self.name, self._n, self._lo, self._hi))
 
 ##########################################################################
 # 4. SHG intensity models

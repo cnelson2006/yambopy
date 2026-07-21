@@ -1,4 +1,5 @@
 
+
 import os
 import numpy as np
 import yaml
@@ -336,7 +337,7 @@ class Stack(object):
             usable &= (w >= lo) & (w <= hi) & (2*w >= lo) & (2*w <= hi)
         return usable
 
-    def _r_ij(ni, nj):
+    def _r_ij(self, ni, nj):
         "Fresnel reflection coefficient between two media."
         return (ni - nj)/(ni + nj)
 

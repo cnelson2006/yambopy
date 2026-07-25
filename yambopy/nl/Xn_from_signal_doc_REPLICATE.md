@@ -4,8 +4,7 @@
 
 #### Myrta Grüning, Claudio Attaccalite, Mike Pointeck, Anna Romani, Mao Yuncheng
 
-This document describes the `Xn_from_signal` abstract python class and a set of derived classes, part of the `YamboPy` code, for extracting nonlinear susceptibilities and conductivities from the macroscopic time-dependent polarization $P$ and current $J$.  An extended theoretical background  can be found in Nonlinear Optics textbooks, see e.g. Sec. 2 of “The Elements of Nonlinear Optics” and the other sources listed in the [bibliography](# Bibliography). The [minimal background](# 0. Minimal theoretical compendium) to understand the code and facilitate further development is given in the next session. The rest of the document is dedicated to describe the [code structure, key workflows, main functions](# 1. Code) and to provide an essential guide of the [code use](# 2. How to use).
-
+This document describes the `shg_analysis` module, part of the `YamboPy` code, for converting the nonlinear susceptibilities extracted by `Xn_from_signal` into measurable second-harmonic generation (SHG) intensities for a 2D material in a layered structure (air / 2D material / dielectric film / substrate).
 ---
 
 ## 0. Minimal theoretical compendium 
@@ -40,35 +39,26 @@ Details on the implementation can be found in the sources listed in the bibliogr
 ## 1. Code
 
 ### 1.1 Input
-It is supposed the `yambo_nl`code (part of the `yambo`/`lumen` suites)  was run in the `nonlinear` mode with a loop on a number of frequencies and generated the `ndb.Nonlinear` (with the corresponding fragments). The nonlinear database `ndb.Nonlinear` is then read using the `nldb`class that outputs an object containing all information and data of the run. This object is the input. Further, the user can change in input the defaults of some analysis parameters (see below). 
+
+Three outputs of a `yambo_nl` run analysed with `Xn_from_sine` are required:
+
+1. `o.YamboPy-X_probe_order_1`, `_2` — the $\chi^{(1)}$, $\chi^{(2)}$ spectra written by `output_analysis` (Gaussian units);
+2. `SAVE/ns.db1` — the lattice database, read with `YamboLatticeDB`, providing the supercell height $L_z$;
+3. `SAVE/ndb.Nonlinear` — the field database, providing the applied intensity $I$ (variable `Field_Intensity_1`, atomic units).
+
+Substrate optical constants are taken from the [refractiveindex.info](https://refractiveindex.info) database via the `refractiveindex` python package, which auto-downloads the database on first use (configurable through the `REFRACTIVEINDEX_DB` environment variable).
 
 ### 1.2 Structure
 
-The code consists of the abstract class, `Xn_from_signal`, and three subclasses corresponding to the three physical situations:
-1. `Xn_from_sine`: a single monochromatic electric field 
-2. `Xn_from_freqmix`: two monochromatic electric fields
-3. `Xn_from_pulse`: a pulse-shaped electric field
+The module is a single file, `yambopy/nl/shg_analysis.py`, organised in numbered sections:
 
-The main method in the abstract class `Xn_from_signal` is `perform_analysis` defining the sequence of operations to be performed. This is shown in the diagram below. First, defaults are set for each implementation (`set_defaults`). Then a loop is entered on field frequencies. For each implementation, the time range `range`is returned for a given frequency (`set_sampling`). Internally, this method also set the number of sampling points `nsamp`in case it is not user-defined. A second loop in entered on the field directions. The time-dependent signal is sampled (`get_sampling`, common to all implementations) and the sampled-signal $P_k$ (`samp_sig`) together with the sampling times $\{t_k\}$ (`samp_time`) is returned. Next, for each implementation, the elements of the matrix $M_{kj}$ (`matrix`) is defined (`define_matrix`). Finally, the linear system is solved (`solve_lin_system`, common to all implementation) and the output passed to the `out` array.  The latter is the input of `output_analysis` and `reconstruct_signal` that are implemented in each subclass.
+1. **Unit conversions and yambo I/O** — `chi2_supercell_to_sheet_SI`, `sheet_to_bulk_chi2`, `nk_from_chi1_supercell`, `intensity_au_to_SI`, and the loaders `load_chi_order`, `supercell_height_SI`, `field_intensity_SI`;
+2. **Database access** — keyword search and record loading over the refractiveindex.info catalog (`search_database`, `print_search`, `load_material`, `get_n`, `get_k`, `get_epsilon`, `database_version`);
+3. **Material objects** — `Substrate` (database optical constants) and `SimulatedMaterial` (effective constants from the run's own $\chi^{(1)}$). Both expose the same interface — `n(E)`, `k(E)`, `complex_index(E)`, `epsilon(E)`, `wl_range_eV()`, `covers(E)` — so the models accept them interchangeably (duck typing);
+4. **SHG intensity models** — `Stack` (structure-factor model, general case), `WoodwardModel` (single-interface strict SI), `ClarkModel` (bulk reference formula, Eq. (4) of [4]).
 
-~~~mermaid
-sequenceDiagram
-    participant Analyzer as Xn_from_signal
-    participant Impl as Subclass (implements abstract hooks)
+Energies outside a layer's data range at either $\omega$ or $2\omega$ yield `NaN` rather than extrapolated values.
 
-Analyzer->>Impl: set_defaults()
-loop for each frequency i_f
-	Analyzer->>Impl: set_sampling(i_f)
-	Impl-->>Analyzer: range
-	loop for each direction i_d
-    	Analyzer->>Analyzer: get_sampling(range, i_d, i_f)
-    	Analyzer->>Impl: define_matrix(samp_time, i_f)
-    	Impl-->>Analyzer: matrix
-    	Analyzer->>Analyzer: solve_lin_system(matrix, samp_sig)
-    	Analyzer->>Analyzer: out[:, i_f, i_d] = raw[:out_dim]
-    end
-end
-~~~
 ### 1.3 Abstract class diagram 
 
 Attributes, constructor, abstract and concrete methods included in `Xn_from_signal`. 

@@ -59,67 +59,61 @@ The module is a single file, `yambopy/nl/shg_analysis.py`, organised in numbered
 
 Energies outside a layer's data range at either $\omega$ or $2\omega$ yield `NaN` rather than extrapolated values.
 
-### 1.3 Abstract class diagram 
-
-Attributes, constructor, abstract and concrete methods included in `Xn_from_signal`. 
-
+### 1.3 Class diagram 
 
 ```mermaid
 classDiagram
-    class Xn_from_signal {
-        <<abstract>>
-        %% --- Attributes ---
-        +time : np.ndarray
-        +T_step : float
-        +T_deph : float
-        +efield : dict
-        +pumps : list
-        +efields : list
-        +n_runs : int
-        +polarization : np.ndarray
-        +current : np.ndarray
-        +l_eval_current : bool
-        +l_out_current : bool
-        +X_order : int
-        +solver : str
-        +samp_mod : str
-        +nsamp : int
-        +T_urange : list[float]
-        +freqs : np.ndarray
-        +prefix : str
-        +out_dim : int
-        +tol : float
-
-        %% --- Constructor ---
-        +__init__(nldb, X_order=4, T_range=[-1,-1], l_out_current=False, nsamp=-1, samp_mod='', solver='', tol=1e-10)
-
-        %% --- Special ---
-        +__str__() str
-
-        %% --- Abstract hooks ---
-        #set_defaults()
-        #set_sampling(ifrq)
-        #define_matrix(samp, ifrq)
-        #update_time_range()
-        #get_Unit_of_Measure(i_order)   
-        #output_analysis(out, to_file)
-        #reconstruct_signal(out, to_file)
-
-        %% --- Concrete methods ---
-        +solve_lin_system(mat, samp, init=None) np.ndarray
-        +perform_analysis() np.ndarray
-        +get_Unit_of_Measure(i_order) float
-        +get_sampling(range, idir, ifrq)
+    class Substrate {
+        +name : str
+        +record : dict
+        +source : str
+        +__init__(name, record_index=0, source=None, db_root=None)
+        +n(E)
+        +k(E)
+        +complex_index(E)
+        +epsilon(E)
+        +wl_range_eV()
+        +covers(E) bool
+        -_check_range(E)
     }
-
-    %% Auxiliary (module-level) functions for completeness
-    class AuxMath {
-        +IsSquare(m) bool
-        +IsWellConditioned(m) bool
-        +residuals_func(x, M, S_i) float
+    class SimulatedMaterial {
+        +name : str
+        +h_2D : float
+        +__init__(omega_eV, chi1_supercell, Lz_SI, h_2D, name)
+        +n(E)
+        +k(E)
+        +complex_index(E)
+        +epsilon(E)
+        +wl_range_eV()
+        +covers(E) bool
     }
+    class Stack {
+        +material_2D
+        +film
+        +substrate
+        +d : float
+        +h_2D : float
+        +__init__(material_2D, film, substrate, film_thickness, h_2D)
+        +usable_omega(omega_eV)
+        +structure_factor(omega_eV)
+        +shg_intensity(omega_eV, chi2_sheet, I)
+        -_r_ij(ni, nj)
+        -_Rs(lambda, n1, n2)
+        -_R_total(lambda, n2D, n1, n2)
+    }
+    class WoodwardModel {
+        +__init__(material_2D, substrate, h_2D)
+        +sheet_intensity(omega_eV, chi2_sheet, I)
+    }
+    class ClarkModel {
+        +__init__(material_2D, substrate, h_2D)
+        +bulk_intensity(omega_eV, chi2_bulk, I)
+    }
+    Stack o-- Substrate : layers
+    Stack o-- SimulatedMaterial : 2D material
+    WoodwardModel o-- SimulatedMaterial
+    ClarkModel o-- SimulatedMaterial
 ```
-
 ### 1.4 Subclasses diagram
 
 The subclasses inherit the attributes and implement the abstract methods from `Xn_from_signal`. In addition: 

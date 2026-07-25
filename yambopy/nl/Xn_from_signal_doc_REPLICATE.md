@@ -61,59 +61,7 @@ Energies outside a layer's data range at either $\omega$ or $2\omega$ yield `NaN
 
 ### 1.3 Class diagram 
 
-```mermaid
-classDiagram
-    class Substrate {
-        +name : str
-        +record : dict
-        +source : str
-        +__init__(name, record_index=0, source=None, db_root=None)
-        +n(E)
-        +k(E)
-        +complex_index(E)
-        +epsilon(E)
-        +wl_range_eV()
-        +covers(E) bool
-        -_check_range(E)
-    }
-    class SimulatedMaterial {
-        +name : str
-        +h_2D : float
-        +__init__(omega_eV, chi1_supercell, Lz_SI, h_2D, name)
-        +n(E)
-        +k(E)
-        +complex_index(E)
-        +epsilon(E)
-        +wl_range_eV()
-        +covers(E) bool
-    }
-    class Stack {
-        +material_2D
-        +film
-        +substrate
-        +d : float
-        +h_2D : float
-        +__init__(material_2D, film, substrate, film_thickness, h_2D)
-        +usable_omega(omega_eV)
-        +structure_factor(omega_eV)
-        +shg_intensity(omega_eV, chi2_sheet, I)
-        -_r_ij(ni, nj)
-        -_Rs(lambda, n1, n2)
-        -_R_total(lambda, n2D, n1, n2)
-    }
-    class WoodwardModel {
-        +__init__(material_2D, substrate, h_2D)
-        +sheet_intensity(omega_eV, chi2_sheet, I)
-    }
-    class ClarkModel {
-        +__init__(material_2D, substrate, h_2D)
-        +bulk_intensity(omega_eV, chi2_bulk, I)
-    }
-    Stack o-- Substrate : layers
-    Stack o-- SimulatedMaterial : 2D material
-    WoodwardModel o-- SimulatedMaterial
-    ClarkModel o-- SimulatedMaterial
-```
+
 ### 1.4 Subclasses diagram
 
 The subclasses inherit the attributes and implement the abstract methods from `Xn_from_signal`. In addition: 
@@ -169,37 +117,42 @@ graph LR
 
 
 
-### Example 1: Monochromatic external field. Harmonic generation from polarization.
+### Example 1: sheet susceptibility from a run
 
-For one monochromatic external field, the `Xn_from_sine` class is instantiated. One can `print` the instance `SIG` to check the value of the class attributes read from `NLDB` and the defaults. Here, the default for `X_order` is overwritten and set to `5`. The output of `perform_analysis` is passed to `OUT`. This is passed as input to `output_analysis` that outputs ` o-DBs.YamboPy-X_probe_order_?`. Second harmonic is in `o-DBs.YamboPy-X_probe_order_2`.
+The spectra written by `Xn_from_sine`/`output_analysis` are loaded, the supercell height is read from the lattice database, and the SI sheet susceptibility is formed. `sheet_to_bulk_chi2` gives the bulk-equivalent value for comparison with pm/V literature numbers.
 
 ```python
-NLDB=YamboNLDB(calc='DBs')
-SIG = Xn_from_sine(NLDB,X_order=5)
-print(SIG)
-OUT = SIG.perform_analysis()
-SIG.output_analysis(OUT)
+omega_eV, chi2_g = load_chi_order('.', order=2)
+lat = YamboLatticeDB.from_db_file(filename='nlinear/SAVE/ns.db1', Expand=False)
+Lz  = supercell_height_SI(lat)
+chi2_sheet = chi2_supercell_to_sheet_SI(chi2_g, Lz)      # m^2/V
+chi2_bulk  = sheet_to_bulk_chi2(chi2_sheet, 0.65e-9)     # m/V
 ```
-### Example 2: Monochromatic external field. Shift-current from current.
 
-For one monochromatic external field, the `Xn_from_sine` class is instantiated. Here, the default for `l_out_current` is overwritten and set to `True`.  This means that the current, rather than the polarization is analysed.  Note that the `yambo_nl` run must output the current together with polarization. The output of `perform_analysis` is passed  to `output_analysis` that outputs ` o-DBs.YamboPy-Sigma_probe_order_?` (shift current is in the `o-DBs.YamboPy-X_probe_order_0` ), and to `reconstruct_signal` that outputs the files `o-DBs.YamboPy-curr_reconstructed_F*` 
+### Example 2: SHG intensity of MoS$_2$ / SiO$_2$(285 nm) / Si
+
+The 2D material is built from the run's own $\chi^{(1)}$; the substrates from the refractiveindex.info database (`print_search("SiO2")` lists the available records with their energy ranges; selection by `source=` is stable against database updates, selection by index is not). The pump intensity of the run is read from `ndb.Nonlinear`. `structure_factor` may be inspected separately from the intensity.
 
 ```python
-NLDB=YamboNLDB(calc="DBs")
-SIG = Xn_from_sine(NLDB,l_out_current=True)
-OUT = SIG.perform_analysis()
-SIG.output_analysis(OUT)
-SIG.reconstruct_signal(OUT)
+_, chi1_g = load_chi_order('.', order=1)
+MoS2   = SimulatedMaterial(omega_eV, chi1_g, Lz, 0.65e-9, name="MoS2")
+silica = Substrate("SiO2", record_index=8)
+si     = Substrate("Si",   record_index=200)
+I0     = field_intensity_SI('nlinear/SAVE/ndb.Nonlinear')
+
+stack = Stack(MoS2, silica, si, film_thickness=285e-9, h_2D=0.65e-9)
+beta  = stack.structure_factor(omega_eV)
+I_shg = stack.shg_intensity(omega_eV, chi2_sheet, I0)
 ```
-### Example 3: Frequency mixing. Sum/difference of frequencies.
 
-For two monochromatic external fields, the `Xn_from_freqmix` class is instantiated. Here, the default for the lower limit`T_range` is overwritten and set to `50 fs`.  The output of `perform_analysis` is passed  to `output_analysis` that in turn outputs `o-DBs.YamboPy-X_probe_order_?_?`  each containing the $\chi^{(|n|+|m|)} (-\omega_\sigma; n\omega_1, m\omega_2 )$. The sum/difference of frequencies is given for $n,m=1$ (`o-DBs.YamboPy-X_probe_order_1_1`) and $n=1, m=-1$ (`o-DBs.YamboPy-X_probe_order_1_-1`).  
+### Example 3: model cross-check on a bare substrate
+
+At $d = 0$ on a transparent substrate, `Stack` and `WoodwardModel` describe the same physics through independent code paths; their ratio should be $\simeq 1$ (residual deviation: substrate dispersion and the monolayer self-reflection, included only in `Stack`). This check is recommended once per new dataset.
 
 ```python
-NLDB=YamboNLDB(calc="DBs")
-SIG = Xn_from_freqmix(NLDB,T_range=[50.0*fs2aut,-1.0])
-OUT = SIG.perform_analysis()
-SIG.output_analysis(OUT)
+stack0 = Stack(MoS2, silica, silica, film_thickness=0.0, h_2D=0.65e-9)
+I_st0  = stack0.shg_intensity(omega_eV, chi2_sheet, I0)
+I_wood = WoodwardModel(MoS2, silica, 0.65e-9).sheet_intensity(omega_eV, chi2_sheet, I0)
 ```
 
 Note: in all snippets one must add `from yambopy import *`
@@ -208,7 +161,9 @@ Note: in all snippets one must add `from yambopy import *`
 
 ## Bibliography
 
-1. Butcher PN, Cotter D. The constitutive relation. In: The Elements of Nonlinear Optics. Cambridge Studies in Modern Optics. Cambridge University Press; 1990:12-36.[doi.org/10.1017/CBO9781139167994](https://doi.org/10.1017/CBO9781139167994)
-2. Attaccalite C and Grüning M, [Phys. Rev. B 88, 235113 (2013)](https://doi.org/10.1103/PhysRevB.88.235113)
-3. Pionteck MN, Grüning M, Sanna S, Attaccalite C, [SciPost Phys. 19, 129 (2025)](https://10.21468/SciPostPhys.19.5.129) 
-4. Romani A, Grüning M, 'Notes on nonlinear analysis from Gaussian pulses' (unpublished)
+1. Song Y, Wang W, Wang Y, Shan Y, Cheng JL, Sipe JE, [Opt. Express 31, 19746 (2023)](https://doi.org/10.1364/OE.486719)
+2. Cheng JL, Sipe JE, Vermeulen N, Guo C, [J. Phys. Photonics 1, 015002 (2019)](https://doi.org/10.1088/2515-7647/aaeadb)
+3. Woodward RI et al., [2D Mater. 4, 011006 (2017)](https://doi.org/10.1088/2053-1583/4/1/011006)
+4. Clark DJ et al., [Phys. Rev. B 90, 121409(R) (2014)](https://doi.org/10.1103/PhysRevB.90.121409)
+5. Bloembergen N, Pershan PS, [Phys. Rev. 128, 606 (1962)](https://doi.org/10.1103/PhysRev.128.606)
+6. Butcher PN, Cotter D. The Elements of Nonlinear Optics. Cambridge University Press; 1990. [doi.org/10.1017/CBO9781139167994](https://doi.org/10.1017/CBO9781139167994)

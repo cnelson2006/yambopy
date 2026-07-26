@@ -1,35 +1,35 @@
 
 
-# `Xn_from_signal`: documentation (version 1.1)
+# `shg_analysis`: documentation 
 
-#### Myrta Grüning, Claudio Attaccalite, Mike Pointeck, Anna Romani, Mao Yuncheng
+#### Myrta Grüning, Other
 
 This document describes the `shg_analysis` module, part of the `YamboPy` code, for converting the nonlinear susceptibilities extracted by `Xn_from_signal` into measurable second-harmonic generation (SHG) intensities for a 2D material in a layered structure (air / 2D material / dielectric film / substrate).
 ---
 
-## 0. Minimal theoretical compendium 
+## 0. Minimal theoretical compendium
 
 **Sheet susceptibility.** `yambo`/`lumen` computes the susceptibility averaged over the whole supercell of height $L_z$, most of which is vacuum. The physically meaningful 2D quantity is the *sheet* susceptibility, obtained by undoing the vacuum dilution and converting from Gaussian (esu) to SI units,
 
-$$ \chi^{(2)}_s = \frac{4\pi}{c\cdot 10^{-4}}\, L_z\, \chi^{(2)}_{\text{supercell}}, \qquad [\chi^{(2)}_s] = \text{m}^2/\text{V}. $$
+$$ \chi^{(2)}_s = \frac{4\pi}{c\cdot 10^{-4}} \cdot L_z \cdot \chi^{(2)}_{\text{supercell}}, \qquad [\chi^{(2)}_s] = \text{m}^2/\text{V}. $$
 
 Bulk-equivalent values quoted in the literature (pm/V) are $\chi^{(2)}_s/h$ with $h$ the monolayer thickness, and therefore depend on the (conventional) choice of $h$.
 
 **Structure factor.** For a normally incident plane wave of intensity $I$ at frequency $\omega$ on the structure air / 2D material / film($d$) / substrate, the SH intensity is (Song et al. [1], built on the sheet-optics framework of Cheng et al. [2])
 
-$$ I(2\omega) = \frac{1}{2\epsilon_0 c}\, |\beta|^2\, \left|\frac{2\pi \chi^{(2)}_s}{\lambda}\right|^2 I^2, \qquad \beta = (1+R_\omega)^2\,(1+R_{2\omega}), $$
+$$ I(2\omega) = \frac{1}{2\epsilon_0 c} \cdot |\beta|^2 \cdot \left|\frac{2\pi \cdot \chi^{(2)}_s}{\lambda}\right|^2 \cdot I^2, \qquad \beta = (1+R_\omega)^2 \cdot (1+R_{2\omega}), $$
 
-where $R_\omega$, $R_{2\omega}$ are the reflection coefficients of the full structure at the fundamental and harmonic. All interference effects are contained in $\beta$; $|\beta|^2 \in [0, 64]$, with the extremes corresponding to fully destructive/constructive interference at both frequencies. $R$ is built from the Fresnel coefficients $r_{ij} = (n_i - n_j)/(n_i + n_j)$, the film phase $e^{2i\tilde\omega n_1 d}$, and the monolayer sheet term $\eta = -\tfrac{i}{2} h\tilde\omega (n_{2D}^2 - 1)$ with $\tilde\omega = 2\pi/\lambda$.
+where $R_\omega$, $R_{2\omega}$ are the reflection coefficients of the full structure at the fundamental and harmonic. All interference effects are contained in $\beta$; $|\beta|^2 \in [0, 64]$, with the extremes corresponding to fully destructive/constructive interference at both frequencies. $R$ is built from the Fresnel coefficients $r_{ij} = (n_i - n_j)/(n_i + n_j)$, the film phase $e^{2i\tilde\omega n_1 d}$, and the monolayer sheet term $\eta = -\tfrac{i}{2} \cdot h \cdot \tilde\omega \cdot (n_{2D}^2 - 1)$ with $\tilde\omega = 2\pi/\lambda$.
 
 **Single-interface limit.** For the 2D material directly on a bare transparent substrate ($d = 0$), the expression reduces to the strict-SI single-interface formula (Woodward et al. [3], Eq. (1)),
 
-$$ I(2\omega) = \frac{32\,\omega^2\, |\chi^{(2)}_s|^2}{\epsilon_0 c^3\, (1+n)^6}\, I^2 . $$
+$$ I(2\omega) = \frac{32 \cdot \omega^2 \cdot |\chi^{(2)}_s|^2}{\epsilon_0 \cdot c^3 \cdot (1+n)^6} \cdot I^2 . $$
 
-**Note on unit conventions.** The frequently cited sheet formula of Clark et al. [4], Eq. (1), carries the prefactor $512\pi^2 = 32\,(4\pi)^2$: a residual $(4\pi)^2$ from an incomplete Gaussian$\to$SI conversion of Bloembergen & Pershan [5], whose radiated fields scale as $4\pi P^{\rm NLS}$ in Gaussian units (the correct SI translation replaces $4\pi P$ by $P/\epsilon_0$). For a given SI $\chi^{(2)}_s$ it therefore overestimates $I(2\omega)$ by $(4\pi)^2 \simeq 158$, and susceptibilities extracted with that pipeline are $4\pi$ below strict-SI values. The module retains Clark's Eq. (4) (bulk thin-slab reference formula, cf. Butcher & Cotter [6] Eq. 7.27) for comparison with that literature.
+**Note on unit conventions.** The frequently cited sheet formula of Clark et al. [4], Eq. (1), carries the prefactor $512\pi^2 = 32\cdot(4\pi)^2$: a residual $(4\pi)^2$ from an incomplete Gaussian$\to$SI conversion of Bloembergen & Pershan [5], whose radiated fields scale as $4\pi P^{\rm NLS}$ in Gaussian units (the correct SI translation replaces $4\pi P$ by $P/\epsilon_0$). For a given SI $\chi^{(2)}_s$ it therefore overestimates $I(2\omega)$ by $(4\pi)^2 \simeq 158$, and susceptibilities extracted with that pipeline are $4\pi$ below strict-SI values. The module retains Clark's Eq. (4) (bulk thin-slab reference formula, cf. Butcher & Cotter [6] Eq. 7.27) for comparison with that literature.
 
 **Effective optical constants of the monolayer.** The Fresnel factors require an effective refractive index for the 2D layer. It is obtained from the linear susceptibility of the same run through the sheet-corrected Gaussian relation
 
-$$ \epsilon = 1 + 4\pi\, \frac{L_z}{h}\, \chi^{(1)}_{\text{supercell}}, \qquad \tilde n = n + ik = \sqrt{\epsilon}, $$
+$$ \epsilon = 1 + 4\pi \cdot \frac{L_z}{h} \cdot \chi^{(1)}_{\text{supercell}}, \qquad \tilde n = n + ik = \sqrt{\epsilon}, $$
 
 a thin-bulk-slab approximation consistent with the $\eta$ sheet term above. These are effective quantities intended for the transfer-matrix model, not literal monolayer properties.
 
@@ -60,6 +60,59 @@ Energies outside a layer's data range at either $\omega$ or $2\omega$ yield `NaN
 
 ### 1.3 Class diagram 
 
+```mermaid
+classDiagram
+    class Substrate {
+        +name : str
+        +record : dict
+        +source : str
+        +__init__(name, record_index=0, source=None, db_root=None)
+        +n(E)
+        +k(E)
+        +complex_index(E)
+        +epsilon(E)
+        +wl_range_eV()
+        +covers(E) bool
+        -_check_range(E)
+    }
+    class SimulatedMaterial {
+        +name : str
+        +h_2D : float
+        +__init__(omega_eV, chi1_supercell, Lz_SI, h_2D, name)
+        +n(E)
+        +k(E)
+        +complex_index(E)
+        +epsilon(E)
+        +wl_range_eV()
+        +covers(E) bool
+    }
+    class Stack {
+        +material_2D
+        +film
+        +substrate
+        +d : float
+        +h_2D : float
+        +__init__(material_2D, film, substrate, film_thickness, h_2D)
+        +usable_omega(omega_eV)
+        +structure_factor(omega_eV)
+        +shg_intensity(omega_eV, chi2_sheet, I)
+        -_r_ij(ni, nj)
+        -_Rs(lambda, n1, n2)
+        -_R_total(lambda, n2D, n1, n2)
+    }
+    class WoodwardModel {
+        +__init__(material_2D, substrate, h_2D)
+        +sheet_intensity(omega_eV, chi2_sheet, I)
+    }
+    class ClarkModel {
+        +__init__(material_2D, substrate, h_2D)
+        +bulk_intensity(omega_eV, chi2_bulk, I)
+    }
+    Stack o-- Substrate : layers
+    Stack o-- SimulatedMaterial : 2D material
+    WoodwardModel o-- SimulatedMaterial
+    ClarkModel o-- SimulatedMaterial
+```
 
 ### 1.4 Sequence of operations in `shg_intensity`
 

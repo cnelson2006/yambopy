@@ -62,60 +62,41 @@ Energies outside a layer's data range at either $\omega$ or $2\omega$ yield `NaN
 ### 1.3 Class diagram 
 
 
-### 1.4 Subclasses diagram
-
-The subclasses inherit the attributes and implement the abstract methods from `Xn_from_signal`. In addition: 
-
-* `Xn_from_freqmix` has the `pump_freq` attribute, which is the frequency of the second electric field, and the `spike_correction` method which performs again the analysis for data points where the simple least square algebraic solution failed, using least square optimization starting from the averaged solution of the neighbouring data points.
-* `Xn_from_pulse`has the `T0` attribute, centre of the Gaussian, and the `build_map` and `divide_by_factor`. The former maps the nonlinearity order $n$ and the number of negative frequencies $m$ into a single index. The latter is a modification of `Divide_by_Field` and is in this class until a proper generalisation of `Divide_by_Field` is available.        
+### 1.4 Sequence of operations in `shg_intensity`
 
 ```mermaid
-classDiagram
-note "Attributes and methods of Xn_from_signal in previous diagram"
-Xn_from_signal <|-- Xn_from_sine
-Xn_from_signal <|-- Xn_from_freqmix
-Xn_from_signal <|-- Xn_from_pulse
-class Xn_from_pulse{
-+ T0 : float
-+ build_map()
-+ divide_by_factor()
-}
-class Xn_from_freqmix{
-+ pump_freq : float
-+ spike_correction()
-}
-class Xn_from_sine
+sequenceDiagram
+    participant U as user
+    participant S as Stack
+    participant M as materials (2D, film, substrate)
+
+U->>S: shg_intensity(omega_eV, chi2_sheet, I)
+S->>S: usable_omega(omega_eV)
+Note over S: keep energies where every layer<br/>has data at omega AND 2*omega
+S->>M: complex_index(omega)
+S->>M: complex_index(2*omega)
+S->>S: R_total at omega and 2*omega
+S->>S: beta = (1+R_w)^2 (1+R_2w)
+S-->>U: I(2w) = |beta|^2 |2pi chi_s / lambda|^2 I^2 / (2 eps0 c)
 ```
+
 ---
 ## 2. How to use
 
-The diagram below illustrates the general use of the code.
-
-Once the appropriate `ndb.Nonlinear` database has been created with `yambo_nl`, the  `YamboNLDB` class is used to read the database and create the object containing all information. 
-
-Depending on the external field used in `yambo_nl`, a different subclass is instantiated:
-
-* `Xn_from_sine`: a single monochromatic electric field 
-* `Xn_from_freqmix`: two monochromatic electric fields
-* `Xn_from_pulse`: a pulse-shaped electric field
-
-All subclasses implement the `perform_analysis()` method (setting up and solving the algebraic problem in the [Theory section](## 0. Theory)). The `output_analysis` writes (by default) the susceptibilities (conductivities) on files. For checking the goodness of the analysis, one may output the reconstructed signal (to be compared with the input signal) with `reconstruct_signal`.  
-
+The diagram below illustrates the general use of the code, continuing the `Xn_from_signal` workflow: the `o.YamboPy-X_probe_order_?` files written by `output_analysis` are the input here.
 
 ```mermaid
-
 graph LR
-    F[(ndb.Nonlinear)]--> A(Read database with YamboNLDB) -->|NLDB| B1(Xn_from_sine) -->|SIG| C(perform_analysis) -->|OUT| D(output_analysis) --> o.*@{shape: lean-l}
-    C --> |OUT|E(reconstruct_signal)
-    E --> o.*@{shape: lean-l}
-    A -->|NLDB| B2(Xn_from_freqmix)
-    A -->|NLDB| B3(Xn_from_pulse)
-    B2 -->|SIG| C
-    B3 -->|SIG| C
-
+    F[(o.YamboPy-X_probe_order_1/2)] --> A(load_chi_order)
+    G[(ns.db1)] --> B(supercell_height_SI) -->|Lz| C(chi2_supercell_to_sheet_SI)
+    A -->|chi2 Gaussian| C -->|chi2_sheet SI| E(Stack.shg_intensity)
+    A -->|chi1 Gaussian| D(SimulatedMaterial)
+    H[(ndb.Nonlinear)] --> I(field_intensity_SI) -->|I0| E
+    J[(refractiveindex.info)] --> K(Substrate)
+    D --> E
+    K --> E
+    E --> O[I of SHG]
 ```
-
-
 
 ### Example 1: sheet susceptibility from a run
 

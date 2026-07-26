@@ -9,30 +9,29 @@ This document describes the `shg_analysis` module, part of the `YamboPy` code, f
 
 ## 0. Minimal theoretical compendium 
 
+**Sheet susceptibility.** `yambo`/`lumen` computes the susceptibility averaged over the whole supercell of height $L_z$, most of which is vacuum. The physically meaningful 2D quantity is the *sheet* susceptibility, obtained by undoing the vacuum dilution and converting from Gaussian (esu) to SI units,
 
-The problem solved is algebraic:
+$$ \chi^{(2)}_s = \frac{4\pi}{c\cdot 10^{-4}}\, L_z\, \chi^{(2)}_{\text{supercell}}, \qquad [\chi^{(2)}_s] = \text{m}^2/\text{V}. $$
 
-$$ M_{kj} S_j = P_k,$$
+Bulk-equivalent values quoted in the literature (pm/V) are $\chi^{(2)}_s/h$ with $h$ the monolayer thickness, and therefore depend on the (conventional) choice of $h$.
 
-where $P_k$ is the time-dependent polarization (or current) sampled on $N_t$ times $\{t_k\}$ which is output by the `yambo`/`lumen`code; the resulting $S_j$ is proportional to the susceptibility (conductivity) of nonlinear order $j$. The matrix of coefficients $M_{kj}$, of dimensions $N_t \times N_\text{nl}$ contains the time dependence to the applied electric field. So far three physical situations are implemented:
-1. a single monochromatic electric field: ${\bf E}_0 \sin(\omega_0 t)$
-2. two monochromatic electric fields: ${\bf E}_0 (\sin(\omega_1 t) + \sin(\omega_2 t))$
-3. a pulse-shaped electric field: ${\bf E}(t) \sin(\omega_0 t)$. Here, it is assumed that the shape of the pulse ${\bf E}(t)$ varies slowly with respect to the period $2\pi/\omega_0$. So far, only a Gaussian pulse, ${\bf E}(t) = {\bf E}_0 \exp(-(t-t_0)^2/(2\sigma^2))/(\sqrt{2}\sigma)$ has been implemented. 
+**Structure factor.** For a normally incident plane wave of intensity $I$ at frequency $\omega$ on the structure air / 2D material / film($d$) / substrate, the SH intensity is (Song et al. [1], built on the sheet-optics framework of Cheng et al. [2])
 
-Four solvers are available:
+$$ I(2\omega) = \frac{1}{2\epsilon_0 c}\, |\beta|^2\, \left|\frac{2\pi \chi^{(2)}_s}{\lambda}\right|^2 I^2, \qquad \beta = (1+R_\omega)^2\,(1+R_{2\omega}), $$
 
-1. the standard solver for full, well-determined matrix:  calls [`numpy.linalg.solve`](https://numpy.org/doc/stable/reference/generated/numpy.linalg.solve.html)
-2. the least square solver, when $N_t \gg N_\text{nl}$ : calls  [`numpy.linalg.lstsq`](https://numpy.org/doc/stable/reference/generated/numpy.linalg.lstsq.html#numpy.linalg.lstsq)
-3. the single value decomposition, using the Moore-Penrose pseudoinverse,  when $N_t \gg N_\text{nl}$: calls [`numpy.linalg.pinv`](https://numpy.org/doc/stable/reference/generated/numpy.linalg.pinv.html#numpy.linalg.pinv)
-4. the least square solver with an initial guess, when $N_t \gg N_\text{nl}$ : calls  [`scipy.optimize.least_squares`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.least_squares.html)
+where $R_\omega$, $R_{2\omega}$ are the reflection coefficients of the full structure at the fundamental and harmonic. All interference effects are contained in $\beta$; $|\beta|^2 \in [0, 64]$, with the extremes corresponding to fully destructive/constructive interference at both frequencies. $R$ is built from the Fresnel coefficients $r_{ij} = (n_i - n_j)/(n_i + n_j)$, the film phase $e^{2i\tilde\omega n_1 d}$, and the monolayer sheet term $\eta = -\tfrac{i}{2} h\tilde\omega (n_{2D}^2 - 1)$ with $\tilde\omega = 2\pi/\lambda$.
 
-From $S_j$ the susceptibilities (or conductivities) $\chi^{(n)}(-\omega_\sigma, \omega_1, \dots, \omega_n)$  are obtained using the following expression:
+**Single-interface limit.** For the 2D material directly on a bare transparent substrate ($d = 0$), the expression reduces to the strict-SI single-interface formula (Woodward et al. [3], Eq. (1)),
 
-$$ S_j = C_0 K (-\omega_\sigma, \omega_1, \dots, \omega_n)\chi^{(n)}(-\omega_\sigma, \omega_1, \dots, \omega_n) $$
+$$ I(2\omega) = \frac{32\,\omega^2\, |\chi^{(2)}_s|^2}{\epsilon_0 c^3\, (1+n)^6}\, I^2 . $$
 
-where $K(-\omega_\sigma; \omega_1, \dots, \omega_n)$ is a numerical factor that accounts for the intrinsic permutation symmetry depending on the nonlinear order and frequency arguments of $\chi$. $C_0$ is a further numerical factor depending on the applied electric field (field strength, normalisation factor, nonlinear order).
+**Note on unit conventions.** The frequently cited sheet formula of Clark et al. [4], Eq. (1), carries the prefactor $512\pi^2 = 32\,(4\pi)^2$: a residual $(4\pi)^2$ from an incomplete Gaussian$\to$SI conversion of Bloembergen & Pershan [5], whose radiated fields scale as $4\pi P^{\rm NLS}$ in Gaussian units (the correct SI translation replaces $4\pi P$ by $P/\epsilon_0$). For a given SI $\chi^{(2)}_s$ it therefore overestimates $I(2\omega)$ by $(4\pi)^2 \simeq 158$, and susceptibilities extracted with that pipeline are $4\pi$ below strict-SI values. The module retains Clark's Eq. (4) (bulk thin-slab reference formula, cf. Butcher & Cotter [6] Eq. 7.27) for comparison with that literature.
 
-Details on the implementation can be found in the sources listed in the bibliography.
+**Effective optical constants of the monolayer.** The Fresnel factors require an effective refractive index for the 2D layer. It is obtained from the linear susceptibility of the same run through the sheet-corrected Gaussian relation
+
+$$ \epsilon = 1 + 4\pi\, \frac{L_z}{h}\, \chi^{(1)}_{\text{supercell}}, \qquad \tilde n = n + ik = \sqrt{\epsilon}, $$
+
+a thin-bulk-slab approximation consistent with the $\eta$ sheet term above. These are effective quantities intended for the transfer-matrix model, not literal monolayer properties.
 
 ---
 

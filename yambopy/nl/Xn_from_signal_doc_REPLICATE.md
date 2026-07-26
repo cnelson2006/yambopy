@@ -180,7 +180,7 @@ I_shg = stack.shg_intensity(omega_eV, chi2_sheet, I0)
 
 ### Example 3: model cross-check on a bare substrate
 
-At $d = 0$ on a transparent substrate, `Stack` and `WoodwardModel` describe the same physics through independent code paths; their ratio should be $\simeq 1$ (residual deviation: substrate dispersion and the monolayer self-reflection, included only in `Stack`). This check is recommended once per new dataset.
+At $d = 0$ on a transparent substrate, `Stack` and `WoodwardModel` describe the same physics through independent code paths; their ratio should be $\simeq 1$. This check is recommended once per new dataset.
 
 ```python
 stack0 = Stack(MoS2, silica, silica, film_thickness=0.0, h_2D=0.65e-9)
@@ -188,7 +188,7 @@ I_st0  = stack0.shg_intensity(omega_eV, chi2_sheet, I0)
 I_wood = WoodwardModel(MoS2, silica, 0.65e-9).sheet_intensity(omega_eV, chi2_sheet, I0)
 ```
 
-Note: in all snippets one must add `from yambopy import *`
+Note: in all snippets one must add `from yambopy import *` and `from yambopy.nl.shg_analysis import *`
 
 ---
 

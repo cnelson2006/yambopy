@@ -1,10 +1,10 @@
 
 
-# `shg_analysis`: documentation 
+# `shg_intensity`: documentation 
 
 #### Myrta Grüning, Corey Nelson
 
-This document describes the `shg_analysis` module, part of the `YamboPy` code, for converting the nonlinear susceptibilities extracted by `Xn_from_signal` into measurable second-harmonic generation (SHG) intensities for a 2D material in a layered structure (air / 2D material / dielectric film / substrate).
+This document describes the `shg_intensity` module, part of the `YamboPy` code, for converting the nonlinear susceptibilities extracted by `Xn_from_signal` into measurable second-harmonic generation (SHG) intensities for a 2D material in a layered structure (air / 2D material / dielectric film / substrate).
 ---
 
 ## 0. Minimal theoretical compendium
@@ -45,11 +45,11 @@ Three outputs of a `yambo_nl` run analysed with `Xn_from_sine` are required:
 2. `SAVE/ns.db1` — the lattice database, read with `YamboLatticeDB`, providing the supercell height $L_z$;
 3. `SAVE/ndb.Nonlinear` — the field database, providing the applied intensity $I$ (variable `Field_Intensity_1`, atomic units).
 
-Substrate optical constants are taken from the [refractiveindex.info](https://refractiveindex.info) database via the `refractiveindex` python package, which auto-downloads the database on first use (configurable through the `REFRACTIVEINDEX_DB` environment variable).
+Substrate optical constants are taken from the [refractiveindex.info](https://refractiveindex.info) database via the `refractiveindex` python package [7], which auto-downloads the database on first use (configurable through the `REFRACTIVEINDEX_DB` environment variable).
 
 ### 1.2 Structure
 
-The module is a single file, `yambopy/nl/shg_analysis.py`, organised in numbered sections:
+The module is a single file, `yambopy/nl/shg_intensity.py`, organised in numbered sections:
 
 1. **Unit conversions and yambo I/O** — `chi2_supercell_to_sheet_SI`, `sheet_to_bulk_chi2`, `nk_from_chi1_supercell`, `intensity_au_to_SI`, and the loaders `load_chi_order`, `supercell_height_SI`, `field_intensity_SI`;
 2. **Database access** — keyword search and record loading over the refractiveindex.info catalog (`search_database`, `print_search`, `load_material`, `get_n`, `get_k`, `get_epsilon`, `database_version`);
@@ -162,7 +162,7 @@ chi2_sheet = chi2_supercell_to_sheet_SI(chi2_g, Lz)      # m^2/V
 chi2_bulk  = sheet_to_bulk_chi2(chi2_sheet, 0.65e-9)     # m/V
 ```
 
-### Example 2: SHG intensity of MoS$_2$ / SiO$_2$(285 nm) / Si
+### Example 2: SHG intensity of $MoS{_2} / SiO{_2}(285 nm)$ / Si
 
 The 2D material is built from the run's own $\chi^{(1)}$; the substrates from the refractiveindex.info database (`print_search("SiO2")` lists the available records with their energy ranges; selection by `source=` is stable against database updates, selection by index is not). The pump intensity of the run is read from `ndb.Nonlinear`. `structure_factor` may be inspected separately from the intensity.
 
@@ -188,7 +188,7 @@ I_st0  = stack0.shg_intensity(omega_eV, chi2_sheet, I0)
 I_wood = WoodwardModel(MoS2, silica, 0.65e-9).sheet_intensity(omega_eV, chi2_sheet, I0)
 ```
 
-Note: in all snippets one must add `from yambopy import *` and `from yambopy.nl.shg_analysis import *`
+Note: in all snippets one must add `from yambopy import *` and `from yambopy.nl.shg_intensity import *`
 
 ---
 

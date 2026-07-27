@@ -2,7 +2,7 @@
 
 # `shg_analysis`: documentation 
 
-#### Myrta Grüning, Other
+#### Myrta Grüning, Corey Nelson
 
 This document describes the `shg_analysis` module, part of the `YamboPy` code, for converting the nonlinear susceptibilities extracted by `Xn_from_signal` into measurable second-harmonic generation (SHG) intensities for a 2D material in a layered structure (air / 2D material / dielectric film / substrate).
 ---
@@ -200,3 +200,5 @@ Note: in all snippets one must add `from yambopy import *` and `from yambopy.nl.
 4. Clark DJ et al., [Phys. Rev. B 90, 121409(R) (2014)](https://doi.org/10.1103/PhysRevB.90.121409)
 5. Bloembergen N, Pershan PS, [Phys. Rev. 128, 606 (1962)](https://doi.org/10.1103/PhysRev.128.606)
 6. Butcher PN, Cotter D. The Elements of Nonlinear Optics. Cambridge University Press; 1990. [doi.org/10.1017/CBO9781139167994](https://doi.org/10.1017/CBO9781139167994)
+7. M. N. Polyanskiy. Refractiveindex.info database of optical constants. Sci. Data 11, 94 (2024)
+https://doi.org/10.1038/s41597-023-02898-2

@@ -68,11 +68,15 @@ def load_chi_order(path_or_folder, order):
     data = np.loadtxt(path)
     return data[:, 0], data[:, 2] + 1j * data[:, 1]
 
+def supercell_height_SI(lattice_db, axis=2):
+    """Out-of-plane supercell height Lz in metres.
 
-def supercell_height_SI(lattice_db):
-    "Out-of-plane supercell height Lz in metres from a YamboLatticeDB - alter this so that user can choose which element is the supercell height"
-    return lattice_db.lat[2, 2] * AU2M
-
+    axis selects the out-of-plane lattice vector (0=a, 1=b, 2=c);
+    default 2=c. Assumes that lattice vector is aligned with a Cartesian
+    axis, which is the usual setup; for a tilted cell the perpendicular
+    spacing must be computed differently.
+    """
+    return lattice_db.lat[axis, axis] * AU2M
 
 def field_intensity_SI(nonlinear_db_path, field_index=1):
     from netCDF4 import Dataset

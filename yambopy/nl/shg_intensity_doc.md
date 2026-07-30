@@ -5,6 +5,9 @@
 #### Myrta Grüning, Corey Nelson
 
 This document describes the `shg_intensity` module, part of the `YamboPy` code, for converting the nonlinear susceptibilities extracted by `Xn_from_signal` into measurable second-harmonic generation (SHG) intensities for a 2D material in a layered structure (air / 2D material / dielectric film / substrate).
+
+Unless stated otherwise, all quantities in the module's public interface are SI — lengths in m, intensities in W m⁻², sheet susceptibilities in m² V⁻¹ with two deliberate exceptions: photon energies are passed in eV, and the raw `o.YamboPy-X_probe` spectra are in Gaussian (esu) units, converted on loading.
+
 ---
 
 ## 0. Minimal theoretical compendium
@@ -25,7 +28,7 @@ where $R_\omega$, $R_{2\omega}$ are the reflection coefficients of the full stru
 
 $$ I(2\omega) = \frac{32 \cdot \omega^2 \cdot |\chi^{(2)}_s|^2}{\epsilon_0 \cdot c^3 \cdot (1+n)^6} \cdot I^2 . $$
 
-**Note on unit conventions.** The frequently cited sheet formula of Clark et al. [4], Eq. (1), carries the prefactor $512\pi^2 = 32\cdot(4\pi)^2$: a residual $(4\pi)^2$ from an incomplete Gaussian$\to$SI conversion of Bloembergen & Pershan [5], whose radiated fields scale as $4\pi P^{\rm NLS}$ in Gaussian units (the correct SI translation replaces $4\pi P$ by $P/\epsilon_0$). For a given SI $\chi^{(2)}_s$ it therefore overestimates $I(2\omega)$ by $(4\pi)^2 \simeq 158$, and susceptibilities extracted with that pipeline are $4\pi$ below strict-SI values. The module retains Clark's Eq. (4) (bulk thin-slab reference formula, cf. Butcher & Cotter [6] Eq. 7.27) for comparison with that literature.
+**Note on unit conventions.** The frequently cited sheet formula of Clark et al. [4], Eq. (1), carries the prefactor $512\pi^2 = 32\cdot(4\pi)^2$: a residual $(4\pi)^2$ from an incomplete Gaussian to SI conversion of Bloembergen & Pershan [5], whose radiated fields scale as $4\pi P^{\rm NLS}$ in Gaussian units (the correct SI translation replaces $4\pi P$ by $P/\epsilon_0$). For a given SI $\chi^{(2)}_s$ it therefore overestimates $I(2\omega)$ by $(4\pi)^2 \simeq 158$, and susceptibilities extracted with that pipeline are $4\pi$ below strict-SI values. The module retains Clark's Eq. (4) (bulk thin-slab reference formula, cf. Butcher & Cotter [6] Eq. 7.27) for comparison with that literature.
 
 **Effective optical constants of the monolayer.** The Fresnel factors require an effective refractive index for the 2D layer. It is obtained from the linear susceptibility of the same run through the sheet-corrected Gaussian relation
 
@@ -40,8 +43,7 @@ a thin-bulk-slab approximation consistent with the $\eta$ sheet term above. Thes
 ### 1.1 Input
 
 Three outputs of a `yambo_nl` run analysed with `Xn_from_sine` are required:
-
-1. `o.YamboPy-X_probe_order_1`, `_2` — the $\chi^{(1)}$, $\chi^{(2)}$ spectra written by `output_analysis` (Gaussian units);
+1. `o.YamboPy-X_probe_order_1`, `_2` — the $\chi^{(1)}$, $\chi^{(2)}$ spectra written by `output_analysis` (Gaussian units). The column layout is `E[eV], Im(x), Re(x), Im(y), Re(y), Im(z), Re(z)` and is fixed for all files; `load_chi_order` returns one Cartesian component at a time, selected with `component="x"/"y"/"z"` (default `"x"`);
 2. `SAVE/ns.db1` — the lattice database, read with `YamboLatticeDB`, providing the supercell height $L_z$;
 3. `SAVE/ndb.Nonlinear` — the field database, providing the applied intensity $I$ (variable `Field_Intensity_1`, atomic units).
 
@@ -152,13 +154,15 @@ graph LR
 
 ### Example 1: sheet susceptibility from a run
 
-The spectra written by `Xn_from_sine`/`output_analysis` are loaded, the supercell height is read from the lattice database, and the SI sheet susceptibility is formed. `sheet_to_bulk_chi2` gives the bulk-equivalent value for comparison with pm/V literature numbers.
+The spectra written by `Xn_from_sine`/`output_analysis` are loaded, the supercell height is read from the lattice database, and the SI sheet susceptibility is formed. `sheet_to_bulk_chi2` gives the bulk-equivalent value for comparison with pm/V literature numbers. For a flat monolayer (point group $D_{3h}$) the out-of-plane response is forbidden by symmetry, so the $z$ columns should read numerically zero — a quick sanity check on the run — while $x$ and $y$ are the two symmetry-related in-plane components.
 
 ```python
-omega_eV, chi2_g = load_chi_order('.', order=2)
+omega_eV, chi2_g = load_chi_order('.', order=2)                  # x component (default)
+omega_eV_y, chi2_g_y      = load_chi_order('.', order=2, component="y")   # second in-plane component
 lat = YamboLatticeDB.from_db_file(filename='nlinear/SAVE/ns.db1', Expand=False)
 Lz  = supercell_height_SI(lat)
 chi2_sheet = chi2_supercell_to_sheet_SI(chi2_g, Lz)      # m^2/V
+# To convert from sheet to bulk enter chi2_sheet along with the effective thickness into the following function
 chi2_bulk  = sheet_to_bulk_chi2(chi2_sheet, 0.65e-9)     # m/V
 ```
 

@@ -55,18 +55,19 @@ def nk_from_chi1_supercell(chi1_supercell, Lz_SI, h_2D):
     return n, k
 
 
-def load_chi_order(path_or_folder, order):
+def load_chi_order(path_or_folder, order, component="x"):
     """Load an o.YamboPy-X_probe_order_N file.
-
-    Returns (omega_eV, chi) with chi complex (Gaussian units), built as
-    column2 + i*column1 per the yambopy output layout.
+    Returns (omega_eV, chi) with chi complex (Gaussian units), per the
+    yambopy output layout: E, Im(x), Re(x), Im(y), Re(y), Im(z), Re(z).
+    component: "x" (default), "y", or "z".
     """
     if os.path.isdir(path_or_folder):
         path = os.path.join(path_or_folder, "o.YamboPy-X_probe_order_%d" % order)
     else:
         path = path_or_folder
     data = np.loadtxt(path)
-    return data[:, 0], data[:, 2] + 1j * data[:, 1]
+    im = {"x": 1, "y": 3, "z": 5}[component]
+    return data[:, 0], data[:, im + 1] + 1j * data[:, im]
 
 def supercell_height_SI(lattice_db, axis=2):
     """Out-of-plane supercell height Lz in metres.

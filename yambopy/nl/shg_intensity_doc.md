@@ -171,7 +171,7 @@ chi2_bulk  = sheet_to_bulk_chi2(chi2_sheet, 0.65e-9)     # m/V
 The 2D material is built from the run's own $\chi^{(1)}$; the substrates from the refractiveindex.info database (`print_search("SiO2")` lists the available records with their energy ranges; selection by `source=` is stable against database updates, selection by index is not). The pump intensity of the run is read from `ndb.Nonlinear`. `structure_factor` may be inspected separately from the intensity.
 
 ```python
-_, chi1_g = load_chi_order('.', order=1)
+omega_eV, chi1_g = load_chi_order('.', order=1)
 MoS2   = SimulatedMaterial(omega_eV, chi1_g, Lz, 0.65e-9, name="MoS2")
 silica = Substrate("SiO2", record_index=8)
 si     = Substrate("Si",   record_index=200)

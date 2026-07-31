@@ -159,7 +159,7 @@ The spectra written by `Xn_from_sine`/`output_analysis` are loaded, the supercel
 ```python
 omega_eV, chi2_g = load_chi_order('.', order=2)                  # x component (default)
 omega_eV_y, chi2_g_y      = load_chi_order('.', order=2, component="y")   # second in-plane component
-lat = YamboLatticeDB.from_db_file(filename='nlinear/SAVE/ns.db1', Expand=False)
+lat = YamboLatticeDB.from_db_file(filename='/SAVE/ns.db1', Expand=False) # Assuming you are in your saved directory
 Lz  = supercell_height_SI(lat)
 chi2_sheet = chi2_supercell_to_sheet_SI(chi2_g, Lz)      # m^2/V
 # To convert from sheet to bulk enter chi2_sheet along with the effective thickness into the following function
@@ -175,7 +175,7 @@ _, chi1_g = load_chi_order('.', order=1)
 MoS2   = SimulatedMaterial(omega_eV, chi1_g, Lz, 0.65e-9, name="MoS2")
 silica = Substrate("SiO2", record_index=8)
 si     = Substrate("Si",   record_index=200)
-I0     = field_intensity_SI('nlinear/SAVE/ndb.Nonlinear')
+I0     = field_intensity_SI('/SAVE/ndb.Nonlinear')
 
 stack = Stack(MoS2, silica, si, film_thickness=285e-9, h_2D=0.65e-9)
 beta  = stack.structure_factor(omega_eV)

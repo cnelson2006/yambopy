@@ -1,208 +1,362 @@
+# From `yambo_nl` to a measurable SHG spectrum: an end-to-end tutorial for `shg_intensity`
 
+This tutorial walks through the complete workflow of the `shg_intensity` module
+(`yambopy/nl/shg_intensity.py`): starting from the raw output of a `yambo_nl`
+real-time simulation and ending with a second-harmonic generation (SHG) intensity
+spectrum that can be compared directly with experiment. Each step shows the code
+first, then explains what it does and why it is done that way.
 
-# `shg_intensity`: documentation 
+Throughout, all quantities in the module's public interface are **SI** — lengths
+in m, intensities in W m⁻², sheet susceptibilities in m² V⁻¹ — with two
+deliberate exceptions: photon energies are passed in **eV**, and the raw
+`o.YamboPy-X_probe` spectra are in **Gaussian (esu) units**, converted explicitly
+during the workflow.
 
-#### Myrta Grüning, Corey Nelson
-
-This document describes the `shg_intensity` module, part of the `YamboPy` code, for converting the nonlinear susceptibilities extracted by `Xn_from_signal` into measurable second-harmonic generation (SHG) intensities for a 2D material in a layered structure (air / 2D material / dielectric film / substrate).
-
-Unless stated otherwise, all quantities in the module's public interface are SI — lengths in m, intensities in W m⁻², sheet susceptibilities in m² V⁻¹ with two deliberate exceptions: photon energies are passed in eV, and the raw `o.YamboPy-X_probe` spectra are in Gaussian (esu) units, converted on loading.
-
----
-
-## 0. Minimal theoretical compendium
-
-**Sheet susceptibility.** `yambo`/`lumen` computes the susceptibility averaged over the whole supercell of height $L_z$, most of which is vacuum. The physically meaningful 2D quantity is the *sheet* susceptibility, obtained by undoing the vacuum dilution and converting from Gaussian (esu) to SI units,
-
-$$ \chi^{(2)}_s = \frac{4\pi}{c\cdot 10^{-4}} \cdot L_z \cdot \chi^{(2)}_{\text{supercell}}, \qquad [\chi^{(2)}_s] = \text{m}^2/\text{V}. $$
-
-Bulk-equivalent values quoted in the literature (pm/V) are $\chi^{(2)}_s/h$ with $h$ the monolayer thickness, and therefore depend on the (conventional) choice of $h$.
-
-**Structure factor.** For a normally incident plane wave of intensity $I$ at frequency $\omega$ on the structure air / 2D material / film($d$) / substrate, the SH intensity is (Song et al. [1], built on the sheet-optics framework of Cheng et al. [2])
-
-$$ I(2\omega) = \frac{1}{2\epsilon_0 c} \cdot |\beta|^2 \cdot \left|\frac{2\pi \cdot \chi^{(2)}_s}{\lambda}\right|^2 \cdot I^2, \qquad \beta = (1+R_\omega)^2 \cdot (1+R_{2\omega}), $$
-
-where $R_\omega$, $R_{2\omega}$ are the reflection coefficients of the full structure at the fundamental and harmonic. All interference effects are contained in $\beta$; $|\beta|^2 \in [0, 64]$, with the extremes corresponding to fully destructive/constructive interference at both frequencies. $R$ is built from the Fresnel coefficients $r_{ij} = (n_i - n_j)/(n_i + n_j)$, the film phase $e^{2i\tilde\omega n_1 d}$, and the monolayer sheet term $\eta = -\tfrac{i}{2} \cdot h \cdot \tilde\omega \cdot (n_{2D}^2 - 1)$ with $\tilde\omega = 2\pi/\lambda$.
-
-**Single-interface limit.** For the 2D material directly on a bare transparent substrate ($d = 0$), the expression reduces to the strict-SI single-interface formula (Woodward et al. [3], Eq. (1)),
-
-$$ I(2\omega) = \frac{32 \cdot \omega^2 \cdot |\chi^{(2)}_s|^2}{\epsilon_0 \cdot c^3 \cdot (1+n)^6} \cdot I^2 . $$
-
-**Note on unit conventions.** The frequently cited sheet formula of Clark et al. [4], Eq. (1), carries the prefactor $512\pi^2 = 32\cdot(4\pi)^2$: a residual $(4\pi)^2$ from an incomplete Gaussian to SI conversion of Bloembergen & Pershan [5], whose radiated fields scale as $4\pi P^{\rm NLS}$ in Gaussian units (the correct SI translation replaces $4\pi P$ by $P/\epsilon_0$). For a given SI $\chi^{(2)}_s$ it therefore overestimates $I(2\omega)$ by $(4\pi)^2 \simeq 158$, and susceptibilities extracted with that pipeline are $4\pi$ below strict-SI values. The module retains Clark's Eq. (4) (bulk thin-slab reference formula, cf. Butcher & Cotter [6] Eq. 7.27) for comparison with that literature.
-
-**Effective optical constants of the monolayer.** The Fresnel factors require an effective refractive index for the 2D layer. It is obtained from the linear susceptibility of the same run through the sheet-corrected Gaussian relation
-
-$$ \epsilon = 1 + 4\pi \cdot \frac{L_z}{h} \cdot \chi^{(1)}_{\text{supercell}}, \qquad \tilde n = n + ik = \sqrt{\epsilon}, $$
-
-a thin-bulk-slab approximation consistent with the $\eta$ sheet term above. These are effective quantities intended for the transfer-matrix model, not literal monolayer properties.
-
----
-
-## 1. Code
-
-### 1.1 Input
-
-Three outputs of a `yambo_nl` run analysed with `Xn_from_sine` are required:
-1. `o.YamboPy-X_probe_order_1`, `_2` — the $\chi^{(1)}$, $\chi^{(2)}$ spectra written by `output_analysis` (Gaussian units). The column layout is `E[eV], Im(x), Re(x), Im(y), Re(y), Im(z), Re(z)` and is fixed for all files; `load_chi_order` returns one Cartesian component at a time, selected with `component="x"/"y"/"z"` (default `"x"`);
-2. `SAVE/ns.db1` — the lattice database, read with `YamboLatticeDB`, providing the supercell height $L_z$;
-3. `SAVE/ndb.Nonlinear` — the field database, providing the applied intensity $I$ (variable `Field_Intensity_1`, atomic units).
-
-Substrate optical constants are taken from the [refractiveindex.info](https://refractiveindex.info) database via the `refractiveindex` python package [7], which auto-downloads the database on first use (configurable through the `REFRACTIVEINDEX_DB` environment variable).
-
-### 1.2 Structure
-
-The module is a single file, `yambopy/nl/shg_intensity.py`, organised in numbered sections:
-
-1. **Unit conversions and yambo I/O** — `chi2_supercell_to_sheet_SI`, `sheet_to_bulk_chi2`, `nk_from_chi1_supercell`, `intensity_au_to_SI`, and the loaders `load_chi_order`, `supercell_height_SI`, `field_intensity_SI`;
-2. **Database access** — keyword search and record loading over the refractiveindex.info catalog (`search_database`, `print_search`, `load_material`, `get_n`, `get_k`, `get_epsilon`, `database_version`);
-3. **Material objects** — `Substrate` (database optical constants) and `SimulatedMaterial` (effective constants from the run's own $\chi^{(1)}$). Both expose the same interface — `n(E)`, `k(E)`, `complex_index(E)`, `epsilon(E)`, `wl_range_eV()`, `covers(E)` — so the models accept them interchangeably;
-4. **SHG intensity models** — `Stack` (structure-factor model, general case), `WoodwardModel` (single-interface strict SI), `ClarkModel` (bulk reference formula, Eq. (4) of [4]).
-
-Energies outside a layer's data range at either $\omega$ or $2\omega$ yield `NaN` rather than extrapolated values.
-
-### 1.3 Class diagram 
-
-```mermaid
-classDiagram
-    class Substrate {
-        +name : str
-        +record : dict
-        +source : str
-        +__init__(name, record_index=0, source=None, db_root=None)
-        +n(E)
-        +k(E)
-        +complex_index(E)
-        +epsilon(E)
-        +wl_range_eV()
-        +covers(E) bool
-        -_check_range(E)
-    }
-    class SimulatedMaterial {
-        +name : str
-        +h_2D : float
-        +__init__(omega_eV, chi1_supercell, Lz_SI, h_2D, name)
-        +n(E)
-        +k(E)
-        +complex_index(E)
-        +epsilon(E)
-        +wl_range_eV()
-        +covers(E) bool
-    }
-    class Stack {
-        +material_2D
-        +film
-        +substrate
-        +d : float
-        +h_2D : float
-        +__init__(material_2D, film, substrate, film_thickness, h_2D)
-        +usable_omega(omega_eV)
-        +structure_factor(omega_eV)
-        +shg_intensity(omega_eV, chi2_sheet, I)
-        -_r_ij(ni, nj)
-        -_Rs(lambda, n1, n2)
-        -_R_total(lambda, n2D, n1, n2)
-    }
-    class WoodwardModel {
-        +__init__(material_2D, substrate, h_2D)
-        +sheet_intensity(omega_eV, chi2_sheet, I)
-    }
-    class ClarkModel {
-        +__init__(material_2D, substrate, h_2D)
-        +bulk_intensity(omega_eV, chi2_bulk, I)
-    }
-    Stack o-- Substrate : layers
-    Stack o-- SimulatedMaterial : 2D material
-    WoodwardModel o-- SimulatedMaterial
-    ClarkModel o-- SimulatedMaterial
-```
-
-### 1.4 Sequence of operations in `shg_intensity`
-
-```mermaid
-sequenceDiagram
-    participant U as user
-    participant S as Stack
-    participant M as materials (2D, film, substrate)
-
-U->>S: shg_intensity(omega_eV, chi2_sheet, I)
-S->>S: usable_omega(omega_eV)
-Note over S: keep energies where every layer<br/>has data at omega AND 2*omega
-S->>M: complex_index(omega)
-S->>M: complex_index(2*omega)
-S->>S: R_total at omega and 2*omega
-S->>S: beta = (1+R_w)^2 (1+R_2w)
-S-->>U: I(2w) = |beta|^2 |2pi chi_s / lambda|^2 I^2 / (2 eps0 c)
-```
-
----
-## 2. How to use
-
-The diagram below illustrates the general use of the code, continuing the `Xn_from_signal` workflow: the `o.YamboPy-X_probe_order_?` files written by `output_analysis` are the input here.
-
-```mermaid
-graph LR
-    F[(o.YamboPy-X_probe_order_1/2)] --> A(load_chi_order)
-    G[(ns.db1)] --> B(supercell_height_SI) -->|Lz| C(chi2_supercell_to_sheet_SI)
-    A -->|chi2 Gaussian| C -->|chi2_sheet SI| E(Stack.shg_intensity)
-    A -->|chi1 Gaussian| D(SimulatedMaterial)
-    H[(ndb.Nonlinear)] --> I(field_intensity_SI) -->|I0| E
-    J[(refractiveindex.info)] --> K(Substrate)
-    D --> E
-    K --> E
-    E --> O[I of SHG]
-```
-
-### Example 1: sheet susceptibility from a run
-
-The spectra written by `Xn_from_sine`/`output_analysis` are loaded, the supercell height is read from the lattice database, and the SI sheet susceptibility is formed. `sheet_to_bulk_chi2` gives the bulk-equivalent value for comparison with pm/V literature numbers. For a flat monolayer (point group $D_{3h}$) the out-of-plane response is forbidden by symmetry, so the $z$ columns should read numerically zero — a quick sanity check on the run — while $x$ and $y$ are the two symmetry-related in-plane components.
+All snippets assume:
 
 ```python
-omega_eV, chi2_g = load_chi_order('.', order=2)                  # x component (default)
-omega_eV_y, chi2_g_y      = load_chi_order('.', order=2, component="y")   # second in-plane component
-lat = YamboLatticeDB.from_db_file(filename='/SAVE/ns.db1', Expand=False) # Assuming you are in your saved directory
-Lz  = supercell_height_SI(lat)
-chi2_sheet = chi2_supercell_to_sheet_SI(chi2_g, Lz)      # m^2/V
-# To convert from sheet to bulk enter chi2_sheet along with the effective thickness into the following function
-chi2_bulk  = sheet_to_bulk_chi2(chi2_sheet, 0.65e-9)     # m/V
+from yambopy import *
+from yambopy.nl.shg_intensity import *
 ```
 
-### Example 2: SHG intensity of $MoS{_2} / SiO{_2}(285 nm)$ / Si
+---
 
-The 2D material is built from the run's own $\chi^{(1)}$; the substrates from the refractiveindex.info database (`print_search("SiO2")` lists the available records with their energy ranges; selection by `source=` is stable against database updates, selection by index is not). The pump intensity of the run is read from `ndb.Nonlinear`. `structure_factor` may be inspected separately from the intensity.
+## 1. What problem does this module solve?
+
+A `yambo`/`lumen` real-time run gives you a *microscopic* nonlinear
+susceptibility χ⁽²⁾. An experimentalist measures a *macroscopic* SHG intensity
+from a sample sitting on a substrate. Three separate gaps stand between the two
+numbers, and the module closes each one:
+
+1. **Units and normalisation.** The simulation output is in Gaussian units and is
+   averaged over a supercell that is mostly vacuum, so its magnitude depends on
+   an arbitrary computational choice (the vacuum padding). It must be converted
+   to a vacuum-independent SI quantity.
+2. **The environment.** The measured signal depends strongly on what the
+   monolayer sits on. A SiO₂ film on Si acts as an interferometer at both the
+   fundamental and the harmonic; constructive or destructive interference can
+   change the detected SHG by orders of magnitude. This is captured by a
+   *structure factor*.
+3. **Trust.** Published formulas for step 2 disagree with each other (one widely
+   cited paper carries a spurious factor of (4π)² ≃ 158 from an incomplete
+   unit conversion). The module therefore implements *several independently
+   derived models* and treats their agreement as the validation criterion.
+
+The workflow is: **load → convert → describe the materials → run the models →
+cross-check**.
+
+---
+
+## 2. What you need before starting
+
+Three outputs of a `yambo_nl` run analysed with `Xn_from_sine`:
+
+* `o.YamboPy-X_probe_order_1` and `_2` — the χ⁽¹⁾ and χ⁽²⁾ spectra
+  (Gaussian units). The column layout is fixed for all files:
+  `E[eV], Im(x), Re(x), Im(y), Re(y), Im(z), Re(z)`.
+* `SAVE/ns.db1` — the lattice database, which provides the supercell height.
+* `SAVE/ndb.Nonlinear` — the field database, which records the pump intensity
+  actually applied in the run.
+
+Substrate optical constants come from the
+[refractiveindex.info](https://refractiveindex.info) database, auto-downloaded on
+first use (location configurable via the `REFRACTIVEINDEX_DB` environment
+variable).
+
+---
+
+## 3. Step 1 — load the run with `ChiLoader`
 
 ```python
-omega_eV, chi1_g = load_chi_order('.', order=1)
-MoS2   = SimulatedMaterial(omega_eV, chi1_g, Lz, 0.65e-9, name="MoS2")
+CHI = ChiLoader('.', 'SAVE', h_2D=0.65e-9)
+print(CHI)
+```
+
+`ChiLoader` is the front door of the module. One object represents one run: it
+reads *both* spectra, keeps the photon-energy grid, opens the lattice database,
+and stores the monolayer thickness you intend to use. The constructor arguments
+are the folder containing the `o.YamboPy-X_probe` files, the run's `SAVE`
+folder, and `h_2D`, the **effective monolayer thickness in m** (0.65 nm is the
+conventional value for MoS₂ — more on why it matters in Step 4).
+
+Two design points are worth understanding rather than just using:
+
+**χ⁽²⁾ is a 3D object.** `CHI.order1` and `CHI.order2` are complex arrays of
+shape `(N, 3)`: all three Cartesian components, columns (x, y, z), loaded
+together. Nothing forces you to choose a direction at load time; the choice is
+made — visibly — at the point of use:
+
+```python
+chi2_x = CHI.component(2, 'x')      # 1D complex array
+chi2_y = CHI.component(2, 'y')
+chi2_z = CHI.component(2, 'z')
+```
+
+**The z component is a free sanity check.** A flat monolayer (point group
+D₃ₕ) cannot have an out-of-plane second-order response — it is forbidden by
+symmetry. So before anything else:
+
+```python
+import numpy as np
+assert np.allclose(CHI.component(2, 'z'), 0.0)
+```
+
+If this fails, something is wrong with the run (geometry, field direction, or
+convergence), and no amount of downstream analysis will fix it. The x and y
+columns are the two symmetry-related in-plane components; x is the default
+throughout the module.
+
+`CHI.omega_eV` is the photon-energy grid of the run, in eV, common to both
+spectra — every model call below takes it as the frequency axis.
+
+---
+
+## 4. Step 2 — convert to physically meaningful quantities
+
+```python
+CHI.supercell_height_SI()          # -> CHI.Lz          (m)
+CHI.chi2_supercell_to_sheet_SI()   # -> CHI.SHG_sheet   (N, 3), m^2/V
+CHI.chi2_supercell_to_eff_SI()     # -> CHI.SHG_eff     (N, 3), m/V
+CHI.nk_from_chi()                  # -> CHI.n, CHI.k
+```
+
+Each method stores its result on the object and returns it; the order above is
+the natural one, and the methods raise informative errors if a prerequisite is
+missing (for example, asking for the sheet susceptibility before `Lz` is set).
+
+**Why `supercell_height_SI` reads the database instead of trusting you.** The
+supercell height `Lz` enters every conversion, so it is read directly from
+`SAVE/ns.db1` — the value the calculation actually used — rather than typed by
+hand. This removes an entire class of transcription errors. (It assumes the
+out-of-plane lattice vector is axis-aligned, which is the standard 2D-material
+setup.)
+
+**Why the *sheet* susceptibility is the primary quantity.** The real-time code
+averages the induced polarisation over the whole supercell, most of which is
+vacuum. Double the vacuum padding and the raw χ⁽²⁾ halves — clearly not
+physics. Multiplying by `Lz`,
+
+χ⁽²⁾ₛ = (4π / c·10⁻⁴) · Lz · χ⁽²⁾_supercell   [m²/V],
+
+undoes the vacuum dilution (and performs the strict Gaussian→SI conversion in
+the same step), giving a quantity independent of the computational box. This is
+what `SHG_sheet` holds, and it is what the recommended intensity models consume.
+
+**Why the "effective" (bulk-equivalent) value exists at all.** The literature
+often quotes χ⁽²⁾ in pm/V, which presumes a 3D material. `SHG_eff = SHG_sheet /
+h_2D` produces that number — but note what this means: it depends on the
+*conventional choice* of monolayer thickness `h_2D`. Two papers using h = 0.65
+nm and h = 0.61 nm will quote different pm/V values for identical physics. Use
+`SHG_eff` to compare with the literature; use `SHG_sheet` for actual
+predictions.
+
+**Why n and k come from the run's own χ⁽¹⁾.** The interference model below
+needs an effective refractive index for the monolayer. Taking it from the same
+simulation that produced χ⁽²⁾ (via ε = 1 + 4π(Lz/h_2D)χ⁽¹⁾) keeps the band
+gap, excitonic features, and broadening *self-consistent* between the linear and
+nonlinear parts — mixing your χ⁽²⁾ with someone else's measured monolayer index
+would not.
+
+---
+
+## 5. Step 3 — describe the materials
+
+The models accept any object exposing `n(E)`, `k(E)`, `complex_index(E)`,
+`epsilon(E)`, `wl_range_eV()`, `covers(E)`. Two classes provide this interface
+from the two places optical constants come from.
+
+**The monolayer, from the simulation:**
+
+```python
+MoS2 = SimulatedMaterial(CHI.omega_eV, CHI.component(1, 'x'),
+                         CHI.Lz, CHI.h_2D, name="MoS2")
+```
+
+**The substrate layers, from experiment:**
+
+```python
+print_search("SiO2")        # list available records with energy ranges
 silica = Substrate("SiO2", record_index=8)
 si     = Substrate("Si",   record_index=200)
-I0     = field_intensity_SI('/SAVE/ndb.Nonlinear')
-
-stack = Stack(MoS2, silica, si, film_thickness=285e-9, h_2D=0.65e-9)
-beta  = stack.structure_factor(omega_eV)
-I_shg = stack.shg_intensity(omega_eV, chi2_sheet, I0)
+print(silica); print(si)    # provenance: source paper, validity range
 ```
 
-### Example 3: model cross-check on a bare substrate
+Why a database rather than hard-coded constants: substrate optics should come
+from *citable experimental measurements*, and a material name alone is
+ambiguous — SiO₂ has many records from different measurement papers covering
+different ranges. `print_search` shows what exists so the choice is explicit,
+and the chosen `source` is provenance that belongs in your thesis methods
+section. If you need long-term reproducibility, select by `source=` (stable
+against database updates) rather than by index, and record
+`database_version()`.
 
-At $d = 0$ on a transparent substrate, `Stack` and `WoodwardModel` describe the same physics through independent code paths; their ratio should be $\simeq 1$. This check is recommended once per new dataset.
-
-```python
-stack0 = Stack(MoS2, silica, silica, film_thickness=0.0, h_2D=0.65e-9)
-I_st0  = stack0.shg_intensity(omega_eV, chi2_sheet, I0)
-I_wood = WoodwardModel(MoS2, silica, 0.65e-9).sheet_intensity(omega_eV, chi2_sheet, I0)
-```
-
-Note: in all snippets one must add `from yambopy import *` and `from yambopy.nl.shg_intensity import *`
+A behavioural difference to know: `Substrate` raises a hard error outside its
+tabulated range (extrapolating measured data is silently wrong), while
+`SimulatedMaterial` returns `NaN` outside its grid (your own grids are dense,
+and NaN keeps full-spectrum plots alive).
 
 ---
 
-## Bibliography
+## 6. Step 4 — compute the SHG intensity
 
-1. Song Y, Wang W, Wang Y, Shan Y, Cheng JL, Sipe JE, [Opt. Express 31, 19746 (2023)](https://doi.org/10.1364/OE.486719)
-2. Cheng JL, Sipe JE, Vermeulen N, Guo C, [J. Phys. Photonics 1, 015002 (2019)](https://doi.org/10.1088/2515-7647/aaeadb)
-3. Woodward RI et al., [2D Mater. 4, 011006 (2017)](https://doi.org/10.1088/2053-1583/4/1/011006)
-4. Clark DJ et al., [Phys. Rev. B 90, 121409(R) (2014)](https://doi.org/10.1103/PhysRevB.90.121409)
-5. Bloembergen N, Pershan PS, [Phys. Rev. 128, 606 (1962)](https://doi.org/10.1103/PhysRev.128.606)
-6. Butcher PN, Cotter D. The Elements of Nonlinear Optics. Cambridge University Press; 1990. [doi.org/10.1017/CBO9781139167994](https://doi.org/10.1017/CBO9781139167994)
-7. M. N. Polyanskiy. Refractiveindex.info database of optical constants. Sci. Data 11, 94 (2024)
-https://doi.org/10.1038/s41597-023-02898-2
+```python
+I0 = field_intensity_SI('SAVE/ndb.Nonlinear')     # W/m^2, the run's own pump
+
+stack = Stack(MoS2, silica, si, film_thickness=285e-9, h_2D=CHI.h_2D)
+beta  = stack.structure_factor(CHI.omega_eV)
+I_shg = stack.shg_intensity(CHI.omega_eV, CHI.SHG_sheet[:, 0], I0)   # W/m^2
+```
+
+`Stack` implements the structure-factor model of Song et al. (Opt. Express 31,
+19746 (2023)) for the geometry air / 2D material / film(d) / substrate:
+
+I(2ω) = |β|² · |2π χ⁽²⁾ₛ / λ|² · I² / (2ε₀c),  β = (1+R_ω)² (1+R_{2ω}).
+
+All environmental physics lives in β: R_ω and R_{2ω} are the reflection
+coefficients of the *full* structure at the fundamental and the harmonic,
+including the film interference and the monolayer's own linear response. The
+factor appears squared at ω because two pump photons drive the process, and once
+at 2ω for the out-coupling of the generated light. |β|² ranges from 0 (fully
+destructive at both frequencies — the film can *hide* your signal) to 64;
+inspecting `structure_factor` separately from the intensity tells you whether a
+weak measured signal is weak physics or unlucky interference, and lets you
+choose an oxide thickness *before* a measurement.
+
+Why the pump intensity is read from `ndb.Nonlinear` rather than typed in: it is
+the field the simulation actually applied, so the predicted intensity is
+consistent with the extracted χ⁽²⁾ by construction.
+
+Note the explicit `[:, 0]` selecting the x component of the sheet
+susceptibility: the models are scalar in the tensor sense, so which component
+(or symmetry-adapted combination) enters is a *visible physics decision* in the
+analysis, not a hidden loader default.
+
+**Practical caveat — coverage at 2ω.** For every energy, every layer must have
+optical data at both ω *and* 2ω. Energies failing this test are returned as
+`NaN` (with a printed warning listing the usable window) rather than silently
+extrapolated. Consequence: your usable fundamental range ends at *half* the
+maximum tabulated energy of your narrowest material. If the top of a spectrum
+comes back NaN, check `stack.usable_omega(CHI.omega_eV)` before suspecting
+anything else.
+
+---
+
+## 7. Step 5 — cross-check before you believe anything
+
+The module's design philosophy: never trust one formula. Three independently
+derived, independently coded models are provided, and agreement between them is
+the validation.
+
+```python
+# d = 0 on a transparent substrate: two independent code paths, same physics
+stack0 = Stack(MoS2, silica, silica, film_thickness=0.0, h_2D=CHI.h_2D)
+I_st0  = stack0.shg_intensity(CHI.omega_eV, CHI.SHG_sheet[:, 0], I0)
+I_wood = WoodwardModel(MoS2, silica, CHI.h_2D).sheet_intensity(
+             CHI.omega_eV, CHI.SHG_sheet[:, 0], I0)
+ratio  = I_st0 / I_wood        # should be ~1 across the usable range
+```
+
+`WoodwardModel` is the strict-SI single-interface sheet formula
+(I(2ω) = 32 ω² |χ⁽²⁾ₛ|² I² / (ε₀ c³ (1+n)⁶), Woodward et al., 2D Mater. 4,
+011006 (2017)). At zero film thickness on a transparent substrate it describes
+the same physics as `Stack` through a completely different derivation, so their
+ratio should be ≃ 1. **Run this check once per new dataset.** If it drifts from
+1, a unit or convention error has crept in somewhere — this style of
+cross-check is precisely how a factor-158 discrepancy in the published
+literature was identified during the development of this module.
+
+On that subject: the widely cited sheet formula of Clark et al. (Phys. Rev. B
+90, 121409(R) (2014), Eq. (1)) carries a spurious (4π)² from an incomplete
+Gaussian→SI conversion of Bloembergen & Pershan (1962). For a given SI χ⁽²⁾ₛ it
+overestimates I(2ω) by ≃ 158, and susceptibilities extracted with it sit 4π
+below strict-SI values. The module deliberately does *not* implement that
+formula; it retains Clark's *bulk thin-slab* reference (their Eq. (4)) as
+`ClarkModel`, which is correct and useful for thickness-scaling comparisons:
+
+```python
+I_bulk = ClarkModel(MoS2, silica, CHI.h_2D).bulk_intensity(
+             CHI.omega_eV, CHI.SHG_eff[:, 0], I0)     # takes the BULK chi2, m/V
+```
+
+Note `ClarkModel` consumes `SHG_eff` (m/V), not `SHG_sheet` — it is a bulk
+formula. `WoodwardModel` also warns loudly if given an absorbing substrate,
+because its derivation assumes transparency; for absorbing substrates the
+`Stack` model is the correct tool.
+
+---
+
+## 8. The whole workflow in one script
+
+```python
+import numpy as np
+from yambopy import *
+from yambopy.nl.shg_intensity import *
+
+# --- 1. load the run -------------------------------------------------------
+CHI = ChiLoader('.', 'SAVE', h_2D=0.65e-9)
+assert np.allclose(CHI.component(2, 'z'), 0.0)      # D3h sanity check
+
+# --- 2. convert ------------------------------------------------------------
+CHI.supercell_height_SI()
+CHI.chi2_supercell_to_sheet_SI()                    # m^2/V, all components
+CHI.chi2_supercell_to_eff_SI()                      # m/V, for pm/V literature
+CHI.nk_from_chi()
+
+# --- 3. materials ----------------------------------------------------------
+MoS2   = SimulatedMaterial(CHI.omega_eV, CHI.component(1, 'x'),
+                           CHI.Lz, CHI.h_2D, name="MoS2")
+silica = Substrate("SiO2", record_index=8)
+si     = Substrate("Si",   record_index=200)
+I0     = field_intensity_SI('SAVE/ndb.Nonlinear')
+
+# --- 4. intensity ----------------------------------------------------------
+stack = Stack(MoS2, silica, si, film_thickness=285e-9, h_2D=CHI.h_2D)
+beta  = stack.structure_factor(CHI.omega_eV)
+I_shg = stack.shg_intensity(CHI.omega_eV, CHI.SHG_sheet[:, 0], I0)
+
+# --- 5. cross-check --------------------------------------------------------
+stack0 = Stack(MoS2, silica, silica, film_thickness=0.0, h_2D=CHI.h_2D)
+ratio  = (stack0.shg_intensity(CHI.omega_eV, CHI.SHG_sheet[:, 0], I0)
+          / WoodwardModel(MoS2, silica, CHI.h_2D).sheet_intensity(
+                CHI.omega_eV, CHI.SHG_sheet[:, 0], I0))
+print("d=0 Stack/Woodward median ratio:", np.nanmedian(ratio))   # expect ~1
+```
+
+---
+
+## 9. Things that commonly go wrong
+
+**The top of the spectrum is NaN.** Coverage at 2ω (Section 6): your usable
+range ends at half the narrowest material's maximum tabulated energy. Inspect
+`stack.usable_omega(...)` and either restrict the grid or choose a substrate
+record with wider coverage.
+
+**pm/V values don't match a paper.** Check the paper's assumed monolayer
+thickness first — bulk-equivalent χ⁽²⁾ scales as 1/h_2D — and then check
+whether the paper's extraction pipeline descends from Clark Eq. (1), in which
+case its susceptibilities sit a factor 4π below strict-SI values by
+construction.
+
+**Numbers change after a database update.** You selected substrate records by
+`record_index`. Re-select by `source=` and record `database_version()`.
+
+**A different run gives wildly different raw χ⁽²⁾.** Compare `Lz` first: the
+raw supercell susceptibility scales with vacuum padding. The *sheet* values are
+the comparable quantities.
+
+**`chi2_supercell_to_eff_SI` or `nk_from_chi` raises.** Both need `h_2D > 0`
+(and `Lz` set): the effective quantities are undefined without a thickness
+convention. Construct the loader with `h_2D=` or set `CHI.h_2D` before calling.
+
+---
+
+## 10. Where the formulas come from
+
+Song et al., Opt. Express 31, 19746 (2023) — structure-factor model (`Stack`);
+Cheng et al., J. Phys. Photonics 1, 015002 (2019) — the sheet-optics framework
+it builds on; Woodward et al., 2D Mater. 4, 011006 (2017) — strict-SI
+single-interface formula (`WoodwardModel`); Clark et al., Phys. Rev. B 90,
+121409(R) (2014) — bulk thin-slab reference (`ClarkModel`) and the unit-convention
+cautionary tale; Bloembergen & Pershan, Phys. Rev. 128, 606 (1962) — the
+original radiating-sheet theory; Butcher & Cotter, *The Elements of Nonlinear
+Optics* (CUP, 1990) — the bulk formula's textbook form.

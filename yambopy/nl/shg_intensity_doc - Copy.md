@@ -33,14 +33,13 @@ numbers, and the module closes each one:
    an arbitrary computational choice (the vacuum padding). It must be converted
    to a vacuum-independent SI quantity.
 2. **The environment.** The measured signal depends strongly on what the
-   monolayer sits on. A SiO₂ film on Si acts as an interferometer at both the
-   fundamental and the harmonic; constructive or destructive interference can
+   monolayer sits on. Constructive or destructive interference at substrate boundary can
    change the detected SHG by orders of magnitude. This is captured by a
    *structure factor*.
 3. **Trust.** Published formulas for step 2 disagree with each other (one widely
    cited paper carries a spurious factor of (4π)² ≃ 158 from an incomplete
-   unit conversion). The module therefore implements *several independently
-   derived models* and treats their agreement as the validation criterion.
+   unit conversion). The module therefore implements several independently
+   derived models and treats their agreement as the validation criterion.
 
 The workflow is: **load → convert → describe the materials → run the models →
 cross-check**.
@@ -65,7 +64,7 @@ variable).
 
 ---
 
-## 3. Step 1 — load the run with `ChiLoader`
+## 3. Step 1: load the run with `ChiLoader`
 
 ```python
 CHI = ChiLoader('.', 'SAVE', h_2D=0.65e-9)
@@ -77,14 +76,13 @@ reads *both* spectra, keeps the photon-energy grid, opens the lattice database,
 and stores the monolayer thickness you intend to use. The constructor arguments
 are the folder containing the `o.YamboPy-X_probe` files, the run's `SAVE`
 folder, and `h_2D`, the **effective monolayer thickness in m** (0.65 nm is the
-conventional value for MoS₂ — more on why it matters in Step 4).
+conventional value for MoS₂).
 
 Two design points are worth understanding rather than just using:
 
-**χ⁽²⁾ is a 3D object.** `CHI.order1` and `CHI.order2` are complex arrays of
+**χ⁽²⁾ is a 3D object.** `CHI.order1` and `CHI.order2` are complex arrays containing N energy values, with a
 shape `(N, 3)`: all three Cartesian components, columns (x, y, z), loaded
-together. Nothing forces you to choose a direction at load time; the choice is
-made — visibly — at the point of use:
+together:
 
 ```python
 chi2_x = CHI.component(2, 'x')      # 1D complex array
@@ -93,8 +91,7 @@ chi2_z = CHI.component(2, 'z')
 ```
 
 **The z component is a free sanity check.** A flat monolayer (point group
-D₃ₕ) cannot have an out-of-plane second-order response — it is forbidden by
-symmetry. So before anything else:
+D₃ₕ) cannot have an out-of-plane second-order response. So before anything else:
 
 ```python
 import numpy as np
@@ -107,11 +104,11 @@ columns are the two symmetry-related in-plane components; x is the default
 throughout the module.
 
 `CHI.omega_eV` is the photon-energy grid of the run, in eV, common to both
-spectra — every model call below takes it as the frequency axis.
+spectra, every model call below takes it as the frequency axis.
 
 ---
 
-## 4. Step 2 — convert to physically meaningful quantities
+## 4. Step 2: convert to physically meaningful quantities
 
 ```python
 CHI.supercell_height_SI()          # -> CHI.Lz          (m)

@@ -71,7 +71,6 @@ def load_chi_order(path_or_folder, order, component="x"):
 
 def supercell_height_SI(lattice_db, axis=2):
     """Out-of-plane supercell height Lz in metres.
-
     axis selects the out-of-plane lattice vector (0=a, 1=b, 2=c);
     default 2=c. Assumes that lattice vector is aligned with a Cartesian
     axis, which is the usual setup; for a tilted cell the perpendicular
@@ -88,6 +87,86 @@ def field_intensity_SI(nonlinear_db_path, field_index=1):
                            % (var, nonlinear_db_path, list(db.variables)))
         intensity_au = float(db.variables[var][:])
     return intensity_au_to_SI(intensity_au)
+
+
+class ChiLoader:
+    
+    COMPONENTS = ("x", "y", "z")
+    
+    def __init__(self, chidir, savedir=None, h_2D=0.0, lattice=None):
+        self.chidir = chidir
+        self.savedir = savedir
+        self.h_2D = float(h_2D)
+        
+        self.omega_eV, self.order1 = self._load_order(1)
+        _omega2, self.order2 = self._load_order(2)
+        if not np.allclose(self.omega_eV, _omega2):
+            raise ValueError("order 1 and order 2 files have different energy grids")
+            
+        if lattice is not None:
+            self.lattice = lattice
+        elif savedir is not None:
+            from yambopy import YamboLatticeDB   # lazy import
+            self.lattice = YamboLatticeDB.from_db_file(
+                filename=os.path.join(savedir, "ns.db1"), Expand=False)
+        else:
+            self.lattice = None
+
+        self.Lz = 0.0
+        self.n = None
+        self.k = None
+        self.SHG_sheet = None
+        self.SHG_eff = None
+    
+    def _load_order(self, order):
+        path = os.path.join(self.chidir, "o.YamboPy-X_probe_order_%d" % order)
+        data = np.loadtxt(path)
+        # column pairs (Im, Re) per component: x=(1,2), y=(3,4), z=(5,6)
+        chi = np.stack([data[:, i + 1] + 1j * data[:, i] for i in (1, 3, 5)], axis=1)
+        return data[:, 0], chi
+
+    def component(self, order, component="x"):
+        "One Cartesian component of chi^(order) as a 1D complex array."
+        idx = self.COMPONENTS.index(component)
+        return (self.order1 if order == 1 else self.order2)[:, idx]
+
+    def supercell_height_SI(self, axis=2):
+        "Set and return the supercell height Lz in m."
+        if self.lattice is None:
+            raise ValueError("no lattice available: construct ChiLoader with savedir= or lattice=")
+        self.Lz = supercell_height_SI(self.lattice, axis=axis)
+        return self.Lz
+
+    def nk_from_chi(self, component="x"):
+        "Effective n, k of the monolayer from the run's own chi^(1)."
+        if not (self.h_2D > 0 and self.Lz > 0):
+            raise ValueError("nk_from_chi requires h_2D > 0 and Lz > 0 (set h_2D and call supercell_height_SI())")
+        self.n, self.k = nk_from_chi1_supercell(self.component(1, component), self.Lz, self.h_2D)
+        return self.n, self.k
+
+    def chi2_supercell_to_sheet_SI(self):
+        "Sheet chi^(2) in m^2/V for all components, shape (N, 3)."
+        if not self.Lz > 0:
+            raise ValueError("chi2_supercell_to_sheet_SI requires Lz > 0 (call supercell_height_SI() first)")
+        self.SHG_sheet = chi2_supercell_to_sheet_SI(self.order2, self.Lz)
+        return self.SHG_sheet
+
+    def chi2_supercell_to_eff_SI(self):
+        "Bulk-equivalent chi^(2) in m/V (sheet / h_2D), shape (N, 3)."
+        if not (self.h_2D > 0 and self.Lz > 0):
+            raise ValueError("chi2_supercell_to_eff_SI requires h_2D > 0 and Lz > 0")
+        if self.SHG_sheet is None:
+            self.chi2_supercell_to_sheet_SI()
+        self.SHG_eff = sheet_to_bulk_chi2(self.SHG_sheet, self.h_2D)
+        return self.SHG_eff
+
+    def __str__(self):
+        return ("\n * * * ChiLoader * * *\n"
+                "Folder   : %s\nEnergies : %d (%.2f-%.2f eV)\n"
+                "h_2D     : %g m\nLz       : %g m\n"
+                % (self.chidir, len(self.omega_eV), self.omega_eV[0], self.omega_eV[-1], self.h_2D, self.Lz))
+        
+
 
 ##########################################################################
 # 2. refractiveindex.info database access
@@ -252,8 +331,7 @@ class Substrate(object):
         if not self.covers(energy_eV):
             lo, hi = self.wl_range_eV()
             raise ValueError("%s (%s): requested energy outside dataset "
-                             "range %.2f-%.2f eV" % (self.name, self.source,
-                                                     lo, hi))
+                             "range %.2f-%.2f eV" % (self.name, self.source, lo, hi))
 
     def n(self, energy_eV):
         self._check_range(energy_eV)

@@ -267,7 +267,7 @@ assumes transparency; use `Stack` for absorbing substrates like Si.
 ```python
 import matplotlib.pyplot as plt
 plt.plot(CHI.omega_eV, I_shg)
-plt.xlabel("photon energy (eV)"); plt.ylabel(r"I(2$\omega$) (W/m$^2$)")
+plt.xlabel("photon energy (eV)"); plt.ylabel(r"I(2ω) (W m⁻²)")
 plt.show()
 ```
 

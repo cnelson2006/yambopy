@@ -25,7 +25,7 @@ from yambopy.nl.shg_intensity import *
 
 ## 0. The whole thing at a glance
 
-If you just want the recipe, this is it — the rest of the tutorial explains
+If you just want the recipe, this is it; the rest of the tutorial explains
 each block:
 
 ```python

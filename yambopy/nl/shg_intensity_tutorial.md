@@ -189,8 +189,9 @@ I0 = field_intensity_SI('SAVE/ndb.Nonlinear')     # W/m^2
 
 ## 4. Compute the SHG intensity
 
-For the standard experimental geometry — monolayer on a dielectric film on a
-substrate — build a `Stack` and call `shg_intensity`:
+
+For the standard experimental geometry, monolayer on a dielectric film on a
+substrate, build a `Stack` and call `shg_intensity`:
 
 ```python
 stack = Stack(MoS2, silica, si, film_thickness=285e-9, h_2D=CHI.h_2D)
@@ -198,7 +199,7 @@ I_shg = stack.shg_intensity(CHI.omega_eV, CHI.SHG_sheet[:, 0], I0)   # W/m^2
 ```
 
 Note the explicit `[:, 0]`: the models take one component of the (N, 3)
-sheet susceptibility, and you choose which — here x. Making that choice at the
+sheet susceptibility, and you choose which (here x). Making that choice at the
 call site keeps the tensor-component decision visible in your analysis instead
 of hidden in a loader default.
 
@@ -314,10 +315,17 @@ I_shg_y = stack.shg_intensity(CHI.omega_eV, CHI.SHG_sheet[:, 1], I0)
 
 ## 8. References
 
-Song et al., Opt. Express 31, 19746 (2023) — the `Stack` structure-factor
-model. Cheng et al., J. Phys. Photonics 1, 015002 (2019) — the sheet-optics
-framework under it. Woodward et al., 2D Mater. 4, 011006 (2017) — the
-single-interface formula (`WoodwardModel`). Clark et al., Phys. Rev. B 90,
-121409(R) (2014) — the bulk reference formula (`ClarkModel`) and the
-unit-convention caution. Bloembergen & Pershan, Phys. Rev. 128, 606 (1962) —
-the original radiating-sheet theory.
+1. **Song et al.**, *Opt. Express* **31**, 19746 (2023) — structure-factor model implemented in `Stack`.
+   [doi.org/10.1364/OE.486719](https://doi.org/10.1364/OE.486719)
+2. **Cheng, Sipe, Vermeulen & Guo**, *J. Phys. Photonics* **1**, 015002 (2019) — the sheet-optics framework the structure factor builds on.
+   [doi.org/10.1088/2515-7647/aaeadb](https://doi.org/10.1088/2515-7647/aaeadb)
+3. **Woodward et al.**, *2D Mater.* **4**, 011006 (2017) — strict-SI single-interface formula implemented in `WoodwardModel`.
+   [doi.org/10.1088/2053-1583/4/1/011006](https://doi.org/10.1088/2053-1583/4/1/011006)
+4. **Clark et al.**, *Phys. Rev. B* **90**, 121409(R) (2014) — bulk thin-slab reference formula implemented in `ClarkModel`; its Eq. (1) is the source of the (4π)² unit-convention caution in Section 5.
+   [doi.org/10.1103/PhysRevB.90.121409](https://doi.org/10.1103/PhysRevB.90.121409)
+5. **Bloembergen & Pershan**, *Phys. Rev.* **128**, 606 (1962) — the original theory of radiation from a nonlinear sheet.
+   [doi.org/10.1103/PhysRev.128.606](https://doi.org/10.1103/PhysRev.128.606)
+6. **Butcher & Cotter**, *The Elements of Nonlinear Optics*, Cambridge University Press (1990) — textbook form of the bulk formula (Eq. 7.27).
+   [doi.org/10.1017/CBO9781139167994](https://doi.org/10.1017/CBO9781139167994)
+
+

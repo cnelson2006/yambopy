@@ -72,7 +72,7 @@ print(CHI)     # summary: number of energies, energy range, h_2D, Lz
 
 One `ChiLoader` object represents one run. Constructing it reads both
 response orders; the `order_1` file (the linear susceptibility χ⁽¹⁾) and the
-`order_2` file (the second-order susceptibility χ⁽²⁾, the SHG quantity, as well as 
+`order_2` file (the second-order susceptibility χ⁽²⁾, the SHG quantity), as well as 
 opening the lattice database. Both are needed later: χ⁽²⁾ is the source of the
 SHG signal, and χ⁽¹⁾ is what the monolayer's refractive index is built from.
 `h_2D` is the effective monolayer thickness in m (0.65 nm is the conventional
@@ -252,7 +252,7 @@ The third model is the bulk thin-slab reference (Clark's Eq. (4)), useful for th
 
 ```python
 I_bulk = ClarkModel(MoS2, silica, CHI.h_2D).bulk_intensity(
-             CHI.omega_eV, CHI.SHG_eff[:, 0], I0)
+             CHI.omega_eV, CHI.SHG_bulk[:, 0], I0)
 ```
 
 `WoodwardModel` warns if you hand it an absorbing substrate as its formula
@@ -321,7 +321,7 @@ I_shg_y = stack.shg_intensity(CHI.omega_eV, CHI.SHG_sheet[:, 1], I0)
    [doi.org/10.1088/2515-7647/aaeadb](https://doi.org/10.1088/2515-7647/aaeadb)
 3. **Woodward et al.**, *2D Mater.* **4**, 011006 (2017) — strict-SI single-interface formula implemented in `WoodwardModel`.
    [doi.org/10.1088/2053-1583/4/1/011006](https://doi.org/10.1088/2053-1583/4/1/011006)
-4. **Clark et al.**, *Phys. Rev. B* **90**, 121409(R) (2014) — bulk thin-slab reference formula implemented in `ClarkModel`; its Eq. (1) is the source of the (4π)² unit-convention caution in Section 5.
+4. **Clark et al.**, *Phys. Rev. B* **90**, 121409(R) (2014) — bulk thin-slab reference formula implemented in `ClarkModel`.
    [doi.org/10.1103/PhysRevB.90.121409](https://doi.org/10.1103/PhysRevB.90.121409)
 5. **Bloembergen & Pershan**, *Phys. Rev.* **128**, 606 (1962) — the original theory of radiation from a nonlinear sheet.
    [doi.org/10.1103/PhysRev.128.606](https://doi.org/10.1103/PhysRev.128.606)

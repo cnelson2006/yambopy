@@ -35,7 +35,7 @@ CHI = ChiLoader('.', 'SAVE', h_2D=0.65e-9)
 # 2. convert to physical quantities
 CHI.supercell_height_SI()          # stores CHI.Lz, the supercell height in m
 CHI.chi2_supercell_to_sheet_SI()   # stores CHI.SHG_sheet, sheet chi2 in m^2/V
-CHI.chi2_supercell_to_eff_SI()     # stores CHI.SHG_eff, bulk-equivalent chi2 in m/V
+CHI.chi2_supercell_to_bulk_SI()     # stores CHI.SHG_bulk, bulk-equivalent chi2 in m/V
 CHI.nk_from_chi()                  # stores CHI.n and CHI.k, the monolayer's n and k
 
 # 3. set up the materials

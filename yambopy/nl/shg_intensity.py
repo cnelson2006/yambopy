@@ -1,4 +1,9 @@
-
+# Copyright (c) 2026, Myrta Gruening, Corey Nelson
+# All rights reserved.
+#
+# This file is part of the yambopy project
+# Calculate shg intensity from second-order susceptibility (yambo_nl + yambopy)
+#
 
 import os
 import numpy as np
@@ -83,8 +88,7 @@ def field_intensity_SI(nonlinear_db_path, field_index=1):
     with Dataset(nonlinear_db_path, "r") as db:
         var = "Field_Intensity_%d" % field_index
         if var not in db.variables:
-            raise KeyError("'%s' not found in %s; available: %s"
-                           % (var, nonlinear_db_path, list(db.variables)))
+            raise KeyError("'%s' not found in %s; available: %s" % (var, nonlinear_db_path, list(db.variables)))
         intensity_au = float(db.variables[var][:])
     return intensity_au_to_SI(intensity_au)
 
@@ -118,7 +122,7 @@ class ChiLoader:
         self.SHG_sheet = None
         self.SHG_bulk = None
     
-    def _load_order(self, order):
+    def load_order(self, order):
         path = os.path.join(self.chidir, "o.YamboPy-X_probe_order_%d" % order)
         data = np.loadtxt(path)
         # column pairs (Im, Re) per component: x=(1,2), y=(3,4), z=(5,6)
@@ -174,16 +178,16 @@ class ChiLoader:
 
 DEFAULT_DB_ROOT = os.path.expanduser("~/.refractiveindex.info-database")
 
-_CATALOG = None
-_DB_ROOT = None
+CATALOG = None
+DB_ROOT = None
 
 
 def load_catalog(db_root=None, force_reload=False):
     "Load (once) and return the refractiveindex.info catalog."
-    global _CATALOG, _DB_ROOT
+    global CATALOG, DB_ROOT
     root = db_root or os.environ.get("REFRACTIVEINDEX_DB", DEFAULT_DB_ROOT)
-    if _CATALOG is not None and not force_reload and root == _DB_ROOT:
-        return _CATALOG
+    if CATALOG is not None and not force_reload and root == DB_ROOT:
+        return CATALOG
     catalog_path = os.path.join(root, "catalog-nk.yml")
     if not os.path.isfile(catalog_path):
         raise FileNotFoundError(
@@ -195,14 +199,14 @@ def load_catalog(db_root=None, force_reload=False):
             "or set REFRACTIVEINDEX_DB / pass db_root=... to point at an "
             "existing copy." % root)
     with open(catalog_path) as f:
-        _CATALOG = yaml.safe_load(f)
-    _DB_ROOT = root
-    return _CATALOG
+        CATALOG = yaml.safe_load(f)
+    DB_ROOT = root
+    return CATALOG
 
 
 def database_version(db_root=None):
     "Database snapshot stamp from its .version file (None if absent)."
-    root = db_root or _DB_ROOT or os.environ.get("REFRACTIVEINDEX_DB",
+    root = db_root or DB_ROOT or os.environ.get("REFRACTIVEINDEX_DB",
                                                  DEFAULT_DB_ROOT)
     path = os.path.join(root, ".version")
     if os.path.isfile(path):
@@ -241,8 +245,7 @@ def search_database(keyword, db_root=None, exact_book=False):
 def load_material(result):
     "Turn one search-result dict into a RefractiveIndexMaterial."
     if RefractiveIndexMaterial is None:
-        raise ImportError("the 'refractiveindex' package is required: "
-                          "pip install refractiveindex")
+        raise ImportError("the 'refractiveindex' package is required: pip install refractiveindex")
     return RefractiveIndexMaterial(shelf=result['shelf'], book=result['book'],
                                    page=result['page'])
 
@@ -316,10 +319,10 @@ class Substrate(object):
                     % (record_index, name, len(results), name))
             self.record = results[record_index]
         self.source = self.record['source']
-        self._material = load_material(self.record)
+        self.material = load_material(self.record)
 
     def wl_range_eV(self):
-        lo, hi = self._material.get_wl_range(unit='eV')
+        lo, hi = self.material.get_wl_range(unit='eV')
         return (min(lo, hi), max(lo, hi))   # eV order flips vs wavelength
 
     def covers(self, energy_eV):
@@ -327,19 +330,18 @@ class Substrate(object):
         lo, hi = self.wl_range_eV()
         return bool(np.all((e >= lo) & (e <= hi)))
 
-    def _check_range(self, energy_eV):
+    def check_range(self, energy_eV):
         if not self.covers(energy_eV):
             lo, hi = self.wl_range_eV()
-            raise ValueError("%s (%s): requested energy outside dataset "
-                             "range %.2f-%.2f eV" % (self.name, self.source, lo, hi))
+            raise ValueError("%s (%s): requested energy outside dataset range %.2f-%.2f eV" % (self.name, self.source, lo, hi))
 
     def n(self, energy_eV):
-        self._check_range(energy_eV)
-        return get_n(self._material, energy_eV)
+        self.check_range(energy_eV)
+        return get_n(self.material, energy_eV)
 
     def k(self, energy_eV):
-        self._check_range(energy_eV)
-        return get_k(self._material, energy_eV)
+        self.check_range(energy_eV)
+        return get_k(self.material, energy_eV)
 
     def complex_index(self, energy_eV):
         return np.asarray(self.n(energy_eV)) + 1j * np.asarray(self.k(energy_eV))
@@ -350,8 +352,7 @@ class Substrate(object):
     def __str__(self):
         lo, hi = self.wl_range_eV()
         return ("\n * * * Substrate * * *\n"
-                "Material : %s\nSource   : %s\nValid    : %.2f-%.2f eV\n"
-                % (self.name, self.source, lo, hi))
+                "Material : %s\nSource   : %s\nValid    : %.2f-%.2f eV\n" % (self.name, self.source, lo, hi))
 
 
 class SimulatedMaterial(object):
@@ -360,18 +361,18 @@ class SimulatedMaterial(object):
                  name="2D material"):
         self.name = name
         self.h_2D = h_2D
-        self._E = np.asarray(omega_eV, float)
+        self.E = np.asarray(omega_eV, float)
         n, k = nk_from_chi1_supercell(np.asarray(chi1_supercell), Lz_SI, h_2D)
-        self._n = np.asarray(n, float)
-        self._k = np.asarray(k, float)
-        self._lo, self._hi = self._E.min(), self._E.max()
+        self.n = np.asarray(n, float)
+        self.k = np.asarray(k, float)
+        self.lo, self.hi = self.E.min(), self.E.max()
 
     def n(self, e):
-        return np.interp(np.asarray(e, float), self._E, self._n,
+        return np.interp(np.asarray(e, float), self.E, self.n,
                          left=np.nan, right=np.nan)
 
     def k(self, e):
-        return np.interp(np.asarray(e, float), self._E, self._k,
+        return np.interp(np.asarray(e, float), self.E, self.k,
                          left=np.nan, right=np.nan)
 
     def complex_index(self, e):
@@ -381,11 +382,11 @@ class SimulatedMaterial(object):
         return self.complex_index(e)**2
 
     def wl_range_eV(self):
-        return (self._lo, self._hi)
+        return (self.lo, self.hi)
 
     def covers(self, e):
         e = np.asarray(e, float)
-        return bool(np.all((e >= self._lo) & (e <= self._hi)))
+        return bool(np.all((e >= self.lo) & (e <= self.hi)))
 
     def __str__(self):
         return ("\n * * * SimulatedMaterial * * *\n"
@@ -420,25 +421,25 @@ class Stack(object):
             usable &= (w >= lo) & (w <= hi) & (2*w >= lo) & (2*w <= hi)
         return usable
 
-    def _r_ij(self, ni, nj):
+    def r_ij(self, ni, nj):
         "Fresnel reflection coefficient between two media."
         return (ni - nj)/(ni + nj)
 
-    def _Rs(self, wavelength, n1, n2):
+    def Rs(self, wavelength, n1, n2):
         "Film+substrate reflection without the 2D layer, including film interference.  Song et al. Eq. (4)."
         w_tilde = 2*np.pi/wavelength
-        r01 = self._r_ij(self.n0, n1)
-        r12 = self._r_ij(n1, n2)
+        r01 = self.r_ij(self.n0, n1)
+        r12 = self.r_ij(n1, n2)
         phase = np.exp(2j*w_tilde*n1*self.d)
         return (r01 + r12*phase)/(1 + r01*r12*phase)
 
-    def _R_total(self, wavelength, n2D, n1, n2):
+    def R_total(self, wavelength, n2D, n1, n2):
         "Total reflection of air/2D/film/substrate.  Song et al. Eq. (3)."
         w_tilde = 2*np.pi/wavelength
         eta = -1j*self.h_2D*w_tilde*(n2D**2 - 1)/2
         r = -eta/(1 + eta)
         t = 1/(1 + eta)
-        Rs = self._Rs(wavelength, n1, n2)
+        Rs = self.Rs(wavelength, n1, n2)
         return r + (Rs*t**2)/(1 - Rs*r)
 
     def structure_factor(self, omega_eV):
@@ -451,14 +452,8 @@ class Stack(object):
             return beta
         wv = w[usable]
         wavelength = HC_EV_M/wv
-        R_w = self._R_total(wavelength,
-                            self.material_2D.complex_index(wv),
-                            self.film.complex_index(wv),
-                            self.substrate.complex_index(wv))
-        R_2w = self._R_total(wavelength/2,
-                             self.material_2D.complex_index(2*wv),
-                             self.film.complex_index(2*wv),
-                             self.substrate.complex_index(2*wv))
+        R_w = self.R_total(wavelength, self.material_2D.complex_index(wv), self.film.complex_index(wv), self.substrate.complex_index(wv))
+        R_2w = self._R_total(wavelength/2, self.material_2D.complex_index(2*wv), self.film.complex_index(2*wv), self.substrate.complex_index(2*wv))
         beta[usable] = (1 + R_w)**2 * (1 + R_2w)
         return beta
 
@@ -468,8 +463,7 @@ class Stack(object):
         wavelength = HC_EV_M/w
         beta = self.structure_factor(w)
         chi_term = np.abs(2*np.pi*np.asarray(chi2_sheet)/wavelength)**2
-        return (1/(2*FREE_SPACE_PERM*speed_of_light_SI)) * np.abs(beta)**2 \
-            * chi_term * I_incident**2
+        return (1/(2*FREE_SPACE_PERM*speed_of_light_SI)) * np.abs(beta)**2 * chi_term * I_incident**2
 
     def __str__(self):
         return ("\n * * * Stack * * *\n"
@@ -487,7 +481,7 @@ class WoodwardModel:
     self.substrate = substrate
     self.h_2D = h_2D
 
-  def _omega_rad(self, omega_eV):
+  def omega_rad(self, omega_eV):
     return np.asarray(omega_eV, float) * electron_charge_SI / hbar
 
   def usable_omega(self, omega_eV):
@@ -502,11 +496,10 @@ class WoodwardModel:
     if not usable.any():
          print("WoodwardModel: no omega usable by the substrate."); return I
     wv = w[usable] # Valid omega values
-    omega = self._omega_rad(wv)
+    omega = self.omega_rad(wv)
     n_complex = np.asarray(self.substrate.complex_index(wv))
     if np.any(np.abs(np.imag(n_complex)) > 0.01):
-      print("WARNING: Woodward sheet model assumes a TRANSPARENT substrate, "
-                  "but this one absorbs (k>0). Use the structure-factor Stack instead.") #
+      print("WARNING: Woodward sheet model assumes a TRANSPARENT substrate, but this one absorbs (k>0). Use the structure-factor Stack instead.") #
     n_q = np.real(n_complex)
     chi = np.asarray(chi2_sheet)[usable] if np.ndim(chi2_sheet) else chi2_sheet
 
@@ -531,7 +524,7 @@ class ClarkModel:
     self.h_2D = h_2D
 
 
-  def _omega_rad(self, omega_eV):
+  def omega_rad(self, omega_eV):
     return np.asarray(omega_eV, float) * electron_charge_SI / hbar
 
 
@@ -548,7 +541,7 @@ class ClarkModel:
     if not usable.any():
          print("ClarkModel: no omega usable by the 2D material at omega and 2*omega."); return I
     wv = w[usable]
-    omega = self._omega_rad(wv)
+    omega = self.omega_rad(wv)
     n_w = np.real(np.asarray(self.material_2D.complex_index(wv)))
     n_2w = np.real(np.asarray(self.material_2D.complex_index(2*wv)))
     chi = np.asarray(chi2_bulk)[usable] if np.ndim(chi2_bulk) else chi2_bulk

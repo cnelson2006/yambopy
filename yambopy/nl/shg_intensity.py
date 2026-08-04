@@ -102,8 +102,8 @@ class ChiLoader:
         self.savedir = savedir
         self.h_2D = float(h_2D)
         
-        self.omega_eV, self.order1 = self._load_order(1)
-        _omega2, self.order2 = self._load_order(2)
+        self.omega_eV, self.order1 = self.load_order(1)
+        _omega2, self.order2 = self.load_order(2)
         if not np.allclose(self.omega_eV, _omega2):
             raise ValueError("order 1 and order 2 files have different energy grids")
             
@@ -453,7 +453,7 @@ class Stack(object):
         wv = w[usable]
         wavelength = HC_EV_M/wv
         R_w = self.R_total(wavelength, self.material_2D.complex_index(wv), self.film.complex_index(wv), self.substrate.complex_index(wv))
-        R_2w = self._R_total(wavelength/2, self.material_2D.complex_index(2*wv), self.film.complex_index(2*wv), self.substrate.complex_index(2*wv))
+        R_2w = self.R_total(wavelength/2, self.material_2D.complex_index(2*wv), self.film.complex_index(2*wv), self.substrate.complex_index(2*wv))
         beta[usable] = (1 + R_w)**2 * (1 + R_2w)
         return beta
 

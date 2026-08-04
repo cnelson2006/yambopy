@@ -116,7 +116,7 @@ class ChiLoader:
         self.n = None
         self.k = None
         self.SHG_sheet = None
-        self.SHG_eff = None
+        self.SHG_bulk = None
     
     def _load_order(self, order):
         path = os.path.join(self.chidir, "o.YamboPy-X_probe_order_%d" % order)
@@ -151,14 +151,14 @@ class ChiLoader:
         self.SHG_sheet = chi2_supercell_to_sheet_SI(self.order2, self.Lz)
         return self.SHG_sheet
 
-    def chi2_supercell_to_eff_SI(self):
+    def chi2_supercell_to_bulk_SI(self):
         "Bulk-equivalent chi^(2) in m/V (sheet / h_2D), shape (N, 3)."
         if not (self.h_2D > 0 and self.Lz > 0):
-            raise ValueError("chi2_supercell_to_eff_SI requires h_2D > 0 and Lz > 0")
+            raise ValueError("chi2_supercell_to_bulk_SI requires h_2D > 0 and Lz > 0")
         if self.SHG_sheet is None:
             self.chi2_supercell_to_sheet_SI()
-        self.SHG_eff = sheet_to_bulk_chi2(self.SHG_sheet, self.h_2D)
-        return self.SHG_eff
+        self.SHG_bulk = sheet_to_bulk_chi2(self.SHG_sheet, self.h_2D)
+        return self.SHG_bulk
 
     def __str__(self):
         return ("\n * * * ChiLoader * * *\n"

@@ -275,7 +275,7 @@ assert np.allclose(CHI.component(2, 'z'), 0.0)     # D3h: no out-of-plane chi2
 
 ```text
 ChiLoader: 100 energies over 0.50–2.97 eV, 3 components (x, y, z)
-h_2D = 6.50e-10 m,  Lz = 2.1167e-09 m
+h_2D = 6.50e-10 m,  Lz = 2.1167e-09 m # Lz is the supercell height found using CHI.supercell_height_SI()
 ```
 
 The z assertion passing is your first confirmation the run is physical, if it
@@ -294,7 +294,7 @@ CHI.nk_from_chi()
 
 ```python
 # Peak sheet |chi2| across the spectrum (a quick magnitude sanity check)
-i = np.nanargmax(np.abs(CHI.SHG_sheet[:, 0]))
+i = np.nanargmax(np.abs(CHI.SHG_sheet[:, 0])) # finds index of peak
 print("peak sheet |chi2|:", abs(CHI.SHG_sheet[i, 0]), "m^2/V at",
      CHI.omega_eV[i], "eV")
 print("bulk-equiv |chi2| there:", abs(CHI.SHG_bulk[i, 0]) * 1e12, "pm/V")

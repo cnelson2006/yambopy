@@ -8,9 +8,9 @@ up the materials, compute the intensity, check the result. Short explanations
 of why each step exists are kept to a few lines; the code blocks are the
 main content and every snippet is runnable as shown.
 
-Conventions: the module works in **SI units** (lengths in m, intensities in
-$W m^{-2}$, sheet susceptibilities in m$^2$ V$^{-1}$), photon energies are
-passed in **eV**, and the raw yambo files are in Gaussian units; the conversion
+Conventions: the module works in $SI$ units (lengths in $m$, intensities in
+$W m^{-2}$, sheet susceptibilities in $m^2 V^{-1}$), photon energies are
+passed in $eV$, and the raw yambo files are in Gaussian units; the conversion
 to SI is one of the steps below.
 
 Every snippet assumes:
@@ -75,9 +75,7 @@ and the `order_2` file (the second-order susceptibility $\chi^{(2)}$, the SHG
 quantity), and it opens the lattice database. Both are needed later:
 $\chi^{(2)}$ is the source of the SHG signal, and $\chi^{(1)}$ is what the
 monolayer's refractive index is built from. `h_2D` is the effective monolayer
-thickness in m (0.65 nm is the conventional MoS$_2$ value). This is only used
-for "effective" quantities and $n$, $k$, so you can pass `h_2D=0` if you never
-need those.
+thickness in m (0.65 nm is the conventional $MoS_2$ value).
 
 After construction you have:
 
@@ -91,8 +89,7 @@ CHI.order2          # chi2 spectrum
 energy (N photon energies), one column per Cartesian direction (x, y, z),
 matching the file layout
 `E[eV], Im(x), Re(x), Im(y), Re(y), Im(z), Re(z)`. Each entry is a single
-complex number, the loader combines each Im/Re column pair into $\mathrm{Re} +
-i\,\mathrm{Im}$ for you. All three directions are loaded because $\chi^{(2)}$ is
+complex number, the loader combines each Im/Re column pair into the normal complex number format (Re + i Im). All three directions are loaded because $\chi^{(2)}$ is
 in general a vector-valued (3D) object; you choose a direction only when you use
 it:
 
@@ -137,7 +134,7 @@ clear error telling you so if it is not set. What each quantity is for:
 * **`CHI.SHG_sheet`** is the sheet susceptibility: the raw $\chi^{(2)}$
   multiplied by `Lz` (undoing the vacuum dilution) and converted to SI. This is
   the vacuum-independent quantity and the one you feed to the intensity models.
-* **`CHI.SHG_bulk`** is $\text{SHG\_sheet} / h_{2D}$; the bulk-equivalent value
+* **`CHI.SHG_bulk`** is **CHI.SHG_sheet** / **$h_{2D}$**, the bulk-equivalent value
   that papers quote in pm/V. Use it only to compare with literature, and
   remember it depends on the thickness convention: a paper using $h = 0.61$ nm
   will quote a different pm/V for identical physics.

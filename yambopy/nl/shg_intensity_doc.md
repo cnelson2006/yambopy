@@ -4,7 +4,7 @@
 
 This document describes the `shg_intensity` module, part of the `YamboPy` code, for converting the nonlinear susceptibilities extracted by `Xn_from_signal` into measurable second-harmonic generation (SHG) intensities for a 2D material in a layered structure (air / 2D material / dielectric film / substrate).
 
-Unless stated otherwise, all quantities in the module's public interface are SI — lengths in m, intensities in W m⁻², sheet susceptibilities in m² V⁻¹ — with two deliberate exceptions: photon energies are passed in eV, and the raw `o.YamboPy-X_probe` spectra are in Gaussian (esu) units, converted on loading.
+Unless stated otherwise, all quantities in the module's public interface are SI — lengths in m, intensities in W m$^{-2}$, sheet susceptibilities in m$^2$ V$^{-1}$ — with two deliberate exceptions: photon energies are passed in eV, and the raw `o.YamboPy-X_probe` spectra are in Gaussian (esu) units, converted on loading.
 
 ---
 
@@ -198,7 +198,7 @@ CHI.chi2_supercell_to_bulk_SI()    # -> CHI.SHG_bulk  (m/V),  for pm/V literatur
 CHI.nk_from_chi()                  # -> CHI.n, CHI.k
 ```
 
-`CHI.omega_eV` is the run's photon-energy grid (eV). `CHI.SHG_sheet` and `CHI.SHG_bulk` have shape `(N, 3)`; pick a component with `CHI.SHG_sheet[:, 0]` (x) or `CHI.component(2, 'y')`.
+`CHI.omega_eV` is the run's photon-energy grid (eV). `CHI.SHG_sheet` and `CHI.SHG_bulk` have shape $(N, 3)$; pick a component with `CHI.SHG_sheet[:, 0]` ($x$) or `CHI.component(2, 'y')`.
 
 The same conversions are available as standalone functions for scripting outside the class — `load_chi_order`, `supercell_height_SI`, `chi2_supercell_to_sheet_SI`, `sheet_to_bulk_chi2`, `nk_from_chi1_supercell` — which `ChiLoader` calls internally.
 

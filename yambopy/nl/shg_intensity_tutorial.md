@@ -283,23 +283,21 @@ raises, stop and check the simulation before going further.
 
 **Convert, and read off a number you can compare with the literature.**
 
+```python
 CHI.supercell_height_SI()
 CHI.chi2_supercell_to_sheet_SI()
 CHI.chi2_supercell_to_bulk_SI()
 CHI.nk_from_chi()
+```
 
-**Peak sheet |chi2| across the spectrum (a quick magnitude sanity check)**
+
 
 ```python
+# Peak sheet |chi2| across the spectrum (a quick magnitude sanity check)
 i = np.nanargmax(np.abs(CHI.SHG_sheet[:, 0]))
 print("peak sheet |chi2|:", abs(CHI.SHG_sheet[i, 0]), "m^2/V at",
      CHI.omega_eV[i], "eV")
 print("bulk-equiv |chi2| there:", abs(CHI.SHG_bulk[i, 0]) * 1e12, "pm/V")
-```
-
-```text
-sheet |chi2| at 1.9 eV: 2.9448e-19 m^2/V
-bulk-equiv |chi2| at 1.9 eV: 453.04 pm/V
 ```
 
 The bulk-equivalent value in pm/V is the quantity to sanity-check: monolayer

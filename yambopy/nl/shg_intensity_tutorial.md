@@ -9,7 +9,7 @@ of why each step exists are kept to a few lines; the code blocks are the
 main content and every snippet is runnable as shown.
 
 Conventions: the module works in **SI units** (lengths in m, intensities in
-W m$^{-2}$, sheet susceptibilities in m$^2$ V$^{-1}$), photon energies are
+$W m^{-2}$, sheet susceptibilities in m$^2$ V$^{-1}$), photon energies are
 passed in **eV**, and the raw yambo files are in Gaussian units; the conversion
 to SI is one of the steps below.
 
@@ -275,7 +275,7 @@ assert np.allclose(CHI.component(2, 'z'), 0.0)     # D3h: no out-of-plane chi2
 
 ```text
 ChiLoader: 100 energies over 0.50–2.97 eV, 3 components (x, y, z)
-h_2D = 6.50e-10 m,  Lz = 2.1167e-09 m # Lz is the supercell height found using CHI.supercell_height_SI()
+h_2D = 6.50e-10 m,  Lz = 2.1167e-09 m (Lz is the supercell height found using CHI.supercell_height_SI())
 ```
 
 The z assertion passing is your first confirmation the run is physical, if it

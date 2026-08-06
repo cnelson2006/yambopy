@@ -256,8 +256,8 @@ assumes transparency; use `Stack` for absorbing substrates like Si.
 
 ## 6. A worked example, start to finish
 
-This section runs the whole pipeline on one concrete case: **monolayer MoS$_2$
-on 285 nm SiO$_2$ on Si**, a fundamental grid spanning 0.50–2.97 eV, and shows
+This section runs the whole pipeline on one concrete case: **monolayer $MoS_2$
+on 285 nm $SiO_2$ on Si**, a fundamental grid spanning 0.50–2.97 eV, and shows
 the output at each stage so you have something to check your own run against.
 The outputs shown are from a real run; your own numbers will differ, and that
 is fine. 
@@ -298,7 +298,7 @@ print("bulk-equiv |chi2| there:", abs(CHI.SHG_bulk[i, 0]) * 1e12, "pm/V")
 ```
 
 The bulk-equivalent value in pm/V is the quantity to sanity-check: monolayer
-MoS$_2$ $\chi^{(2)}$ is expected in the hundreds of pm/V, so a peak of this
+$MoS_2 \chi^{(2)}$ is expected in the hundreds of pm/V, so a peak of this
 order confirms the unit chain is right. Remember (Section 2) that any pm/V
 comparison is only as fixed as the assumed monolayer thickness; the same
 physics quoted with a different $h$ gives a different number.
@@ -342,8 +342,8 @@ plt.title("SHG intensity — MoS$_2$ / 285 nm SiO$_2$ / Si")
 plt.show()
 ```
 
-You should see a curve tracking the MoS$_2$ resonances, modulated by the
-SiO$_2$/Si interference through the structure factor.
+You should see a curve tracking the $MoS_2$ resonances, modulated by the
+$SiO_2/Si$ interference through the structure factor.
 
 **Confirm you believe it.** The last thing to do is the
 independent cross-check:
@@ -402,7 +402,7 @@ I_shg_y = stack.shg_intensity(CHI.omega_eV, CHI.SHG_sheet[:, 1], I0)
 
 ## 8. If something goes wrong
 
-* **NaN at high energies**: the $\omega$-and-$2\omega$ coverage limit
+* **NaN at high energies**: the $\omega/2\omega$ coverage limit
   (Section 4). Check `stack.usable_omega(...)`; restrict the grid or pick a
   substrate record with wider coverage.
 * **A method raises "requires Lz > 0" or "requires h_2D > 0"**: call

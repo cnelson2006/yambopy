@@ -4,13 +4,13 @@
 
 This document describes the `shg_intensity` module, part of the `YamboPy` code, for converting the nonlinear susceptibilities extracted by `Xn_from_signal` into measurable second-harmonic generation (SHG) intensities for a 2D material in a layered structure (air / 2D material / dielectric film / substrate).
 
-Unless stated otherwise, all quantities in the module's public interface are SI — lengths in m, intensities in W m$^{-2}$, sheet susceptibilities in m$^2$ V$^{-1}$ — with two deliberate exceptions: photon energies are passed in eV, and the raw `o.YamboPy-X_probe` spectra are in Gaussian (esu) units, converted on loading.
+Unless stated otherwise, all quantities in the module's public interface are SI — lengths in $m$, intensities in $W m^{-2}$, sheet susceptibilities in $m^2 V^{-1}$ — with two deliberate exceptions: photon energies are passed in $eV$, and the raw `o.YamboPy-X_probe` spectra are in Gaussian (esu) units, converted on loading.
 
 ---
 
 ## 0. Minimal theoretical compendium
 
-**Sheet susceptibility.** `yambo`/`lumen` computes the susceptibility averaged over the whole supercell of height $L_z$, most of which is vacuum. The physically meaningful 2D quantity is the *sheet* susceptibility, obtained by undoing the vacuum dilution and converting from Gaussian (esu) to SI units,
+**Sheet susceptibility.** `yambo`/`lumen` computes the susceptibility averaged over the whole supercell of height $L_z$, most of which is vacuum. The physically meaningful 2D quantity is the sheet susceptibility, obtained by undoing the vacuum dilution and converting from Gaussian (esu) to SI units,
 
 $$ \chi^{(2)}_s = \frac{4\pi}{c\cdot 10^{-4}} \cdot L_z \cdot \chi^{(2)}_{\text{supercell}}, \qquad [\chi^{(2)}_s] = \text{m}^2/\text{V}. $$
 
@@ -26,7 +26,7 @@ where $R_\omega$, $R_{2\omega}$ are the reflection coefficients of the full stru
 
 $$ I(2\omega) = \frac{32 \cdot \omega^2 \cdot |\chi^{(2)}_s|^2}{\epsilon_0 \cdot c^3 \cdot (1+n)^6} \cdot I^2 . $$
 
-**Note on unit conventions.** The frequently cited sheet formula of Clark et al. [4], Eq. (1), carries the prefactor $512\pi^2 = 32\cdot(4\pi)^2$: a residual $(4\pi)^2$ from an incomplete Gaussian-to-SI conversion of Bloembergen & Pershan [5], whose radiated fields scale as $4\pi P^{\rm NLS}$ in Gaussian units (the correct SI translation replaces $4\pi P$ by $P/\epsilon_0$). For a given SI $\chi^{(2)}_s$ it therefore overestimates $I(2\omega)$ by $(4\pi)^2 \simeq 158$, and susceptibilities extracted with that pipeline are $4\pi$ below strict-SI values. The module retains Clark's Eq. (4) (bulk thin-slab reference formula, cf. Butcher & Cotter [6] Eq. 7.27) for comparison with that literature.
+**Note on unit conventions.** The sheet formula of Clark et al. [4], Eq. (1), carries the prefactor $512\pi^2 = 32\cdot(4\pi)^2$: a residual $(4\pi)^2$ from an incomplete Gaussian-to-SI conversion of Bloembergen & Pershan [5], whose radiated fields scale as $4\pi P^{\rm NLS}$ in Gaussian units (the correct SI translation replaces $4\pi P$ by $P/\epsilon_0$). For a given SI $\chi^{(2)}_s$ it therefore overestimates $I(2\omega)$ by $(4\pi)^2 \simeq 158$, and susceptibilities extracted with that pipeline are $4\pi$ below strict-SI values. The module retains Clark's Eq. (4) (bulk thin-slab reference formula, cf. Butcher & Cotter [6] Eq. 7.27) for comparison with that literature.
 
 **Effective optical constants of the monolayer.** The Fresnel factors require an effective refractive index for the 2D layer. It is obtained from the linear susceptibility of the same run through the sheet-corrected Gaussian relation
 
@@ -146,7 +146,7 @@ sequenceDiagram
 
 U->>C: ChiLoader(chidir, savedir, h_2D)
 Note over C: loads chi1 and chi2 (x, y, z),<br/>reads the lattice
-U->>C: supercell_height_SI(); chi2_supercell_to_sheet_SI()
+U->>C: supercell_height_SI() then chi2_supercell_to_sheet_SI()
 C-->>U: CHI.Lz, CHI.SHG_sheet
 U->>S: shg_intensity(omega_eV, SHG_sheet[:, 0], I0)
 S->>S: usable_omega(omega_eV)
@@ -185,7 +185,7 @@ from yambopy.nl.shg_intensity import *
 
 ### Example 1: load a run and form the sheet susceptibility
 
-One `ChiLoader` represents one run. Constructing it loads both spectra (all three Cartesian components) and opens the lattice database; `h_2D` is the effective monolayer thickness in m. The conversion methods store their results on the object. For a flat monolayer (point group $D_{3h}$) the out-of-plane response is forbidden by symmetry, so the $z$ component should read numerically zero — a quick sanity check on the run — while $x$ and $y$ are the two symmetry-related in-plane components.
+One `ChiLoader` represents one run. Constructing it loads both spectra (all three Cartesian components) and opens the lattice database; `h_2D` is the effective monolayer thickness in $m$. The conversion methods store their results on the object. For a flat monolayer (point group $D_{3h}$) the out-of-plane response is forbidden by symmetry, so the $z$ component should read numerically zero.
 
 ```python
 CHI = ChiLoader('.', 'SAVE', h_2D=0.65e-9)
@@ -200,7 +200,7 @@ CHI.nk_from_chi()                  # -> CHI.n, CHI.k
 
 `CHI.omega_eV` is the run's photon-energy grid (eV). `CHI.SHG_sheet` and `CHI.SHG_bulk` have shape $(N, 3)$; pick a component with `CHI.SHG_sheet[:, 0]` ($x$) or `CHI.component(2, 'y')`.
 
-The same conversions are available as standalone functions for scripting outside the class — `load_chi_order`, `supercell_height_SI`, `chi2_supercell_to_sheet_SI`, `sheet_to_bulk_chi2`, `nk_from_chi1_supercell` — which `ChiLoader` calls internally.
+The same conversions are available as standalone functions for scripting outside the class — `load_chi_order`, `supercell_height_SI`, `chi2_supercell_to_sheet_SI`, `sheet_to_bulk_chi2`, `nk_from_chi1_supercell`, which `ChiLoader` calls internally.
 
 ### Example 2: SHG intensity of $\text{MoS}_2 / \text{SiO}_2(285\,\text{nm}) / \text{Si}$
 
